@@ -40,83 +40,128 @@ ServerSocket::ServerSocket() {
     initializeHandlers();
 }
 
-MessageType ServerSocket::hashMessage(const std::string& message) {
+MessageType ServerSocket::hashMessage(const std::string message) {
+    static const std::unordered_map<std::string, MessageType> messageMap = {
+        {"shutdown", SHUTDOWN},
+        {"restart", RESTART},
+        {"getIP", GET_IP},
+        {"HelloServer", HELLO_SERVER},
+        {"STOP", STOP},
+        {"captureScreen", CAPTURE_SCREEN},
+        {"copy", COPY_FILE},
+        {"delete", DELETE_FILE},
+        {"createFolder", CREATE_FOLDER},
+        {"copyFolder", COPY_FOLDER}
+    };
 
-    static const std::unordered_map<std::string, MessageType> 
-        messageMap = {
+    std::istringstream iss(message);
+    std::string command;
+    iss >> command;
 
-            {"shutdown", SHUTDOWN},
-            {"restart", RESTART},
-            {"get IP", GET_IP},
-            {"Hello server", HELLO_SERVER},
-            {"STOP", STOP},
-            {"capture screen", CAPTURE_SCREEN},
-            {"copy file", COPY_FILE},
-            {"delete file", DELETE_FILE},
-            {"create folder", CREATE_FOLDER},
-            {"copy folder", COPY_FOLDER}
-
-        };
-
-    auto it = messageMap.find(message);
-
+    auto it = messageMap.find(command);
     return (it != messageMap.end() ? it->second : INVALID);
 }
 
 void ServerSocket::initializeHandlers()
 {
-    handlers[SHUTDOWN] = [](SOCKET&) { 
+    handlers[SHUTDOWN] = [](SOCKET&, const std::string& command) { 
         WinAPI::systemShutdown(); 
     };
 
-    handlers[RESTART] = [](SOCKET&) { 
+    handlers[RESTART] = [](SOCKET&, const std::string& command) { 
         LPWSTR restartMessage = L"RESTART"; 
         WinAPI::systemRestart(restartMessage); 
     };
 
-    handlers[GET_IP] = [this](SOCKET& clientSocket) { 
+    handlers[GET_IP] = [this](SOCKET& clientSocket, const std::string& command) { 
         this->sendIPAddress(clientSocket); 
     };
 
-    handlers[HELLO_SERVER] = [this](SOCKET& clientSocket) {
+    handlers[HELLO_SERVER] = [this](SOCKET& clientSocket, const std::string& command) {
         std::string response = "Hello from server!";
         this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[STOP] = [this](SOCKET& clientSocket) {
+    handlers[STOP] = [this](SOCKET& clientSocket, const std::string& command) {
         this->~ServerSocket();
         closesocket(clientSocket);
         exit(0);
     };
 
-    handlers[CAPTURE_SCREEN] = [this](SOCKET& clientSocket) {
+    handlers[CAPTURE_SCREEN] = [this](SOCKET& clientSocket, const std::string& command) {
         std::string result = WinAPI::saveScreenshot();
         std::string response = (result.substr(0, 6) != "Failed") ? "Capture screen successful, new file: " + result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[COPY_FILE] = [this](SOCKET& clientSocket) {
-        const wchar_t* source = L"source.txt";
-        const wchar_t* destination = L"destination.txt";
-        std::string result = WinAPI::copyFile(source, destination);
+    handlers[COPY_FILE] = [this](SOCKET& clientSocket, const std::string& command) {
+        std::istringstream iss(command);
+        std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
+
+        if (tokens.size() != 3) {
+            std::string guide = "Usage: copy <source_path> <destination_path>";
+            this->sendMessage(clientSocket, guide.c_str());
+            return;
+        }
+
+        const std::wstring source = std::wstring(tokens[1].begin(), tokens[1].end());
+        const std::wstring destination = std::wstring(tokens[2].begin(), tokens[2].end());
+
+        std::string result = WinAPI::copyFile(source.c_str(), destination.c_str());
         std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[DELETE_FILE] = [](SOCKET&) { 
-        const wchar_t* fileToDelete = L"file.txt"; 
-        WinAPI::deleteFile(fileToDelete); 
+    handlers[DELETE_FILE] = [this](SOCKET &clientSocket, const std::string& command) { 
+        std::istringstream iss(command);
+        std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
+
+        if (tokens.size() != 2) {
+            std::string guide = "Usage: delete <source_path>";
+            this->sendMessage(clientSocket, guide.c_str());
+            return;
+        }
+
+        const std::wstring source = std::wstring(tokens[1].begin(), tokens[1].end());
+
+        std::string result = WinAPI::deleteFile(source.c_str());
+        std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
+        this->sendMessage(clientSocket, response.c_str());   
     };
 
-    handlers[CREATE_FOLDER] = [](SOCKET&) { 
-        const wchar_t* folderPath = L"new_folder"; 
-        WinAPI::createFolder(folderPath); 
+    handlers[CREATE_FOLDER] = [this](SOCKET& clientSocket, const std::string& command) {
+        std::istringstream iss(command);
+        std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
+
+        if (tokens.size() != 2) {
+            std::string guide = "Usage: createFolder <folder_path>";
+            this->sendMessage(clientSocket, guide.c_str());
+            return;
+        }
+
+        const std::wstring folderPath = std::wstring(tokens[1].begin(), tokens[1].end());
+
+        std::string result = WinAPI::createFolder(folderPath.c_str());
+        std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
+        this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[COPY_FOLDER] = [](SOCKET&) { 
-        const wchar_t* sourceFolder = L"source_folder"; 
-        const wchar_t* destinationFolder = L"destination_folder"; 
-        WinAPI::copyFolder(sourceFolder, destinationFolder); 
+    handlers[COPY_FOLDER] = [this](SOCKET& clientSocket, const std::string& command) {
+        std::istringstream iss(command);
+        std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
+
+        if (tokens.size() != 3) {
+            std::string guide = "Usage: copyFolder <source_folder> <destination_folder>";
+            this->sendMessage(clientSocket, guide.c_str());
+            return;
+        }
+
+        const std::wstring sourceFolder = std::wstring(tokens[1].begin(), tokens[1].end());
+        const std::wstring destinationFolder = std::wstring(tokens[2].begin(), tokens[2].end());
+
+        bool success = WinAPI::copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
+        std::string response = success ? "Folder copied successfully" : "Failed to copy folder";
+        this->sendMessage(clientSocket, response.c_str());
     };
 }
 
@@ -124,7 +169,7 @@ void ServerSocket::handleEvent(SOCKET &clientSocket, const std::string& message)
     MessageType messageType = hashMessage(message);
     auto it = handlers.find(messageType);
     if (it != handlers.end()) {
-        it->second(clientSocket);
+        it->second(clientSocket, message);
     } else {
         std::string invalidMessage = "INVALID MESSAGE";
         send(clientSocket, invalidMessage.c_str(), static_cast<int>(invalidMessage.length()), 0);

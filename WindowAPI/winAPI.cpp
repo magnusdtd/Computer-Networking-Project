@@ -197,7 +197,8 @@ namespace WinAPI {
             std::string str = wcharToString(source);
             result = "File copied successfully: " + str;
         } else {
-            std::cout << "Failed to copy file: " << wcharToString(source) << '\n';
+            result = "Failed to copy file: " + wcharToString(source);
+            std::cout << result << '\n';
         }
         return result;
     }
@@ -208,7 +209,8 @@ namespace WinAPI {
             std::string str = wcharToString(fileToDelete);
             result = "File deleted successfully: " + str;
         } else {
-            std::cout << "Failed to delete file: " << wcharToString(fileToDelete) << '\n';
+            result = "Failed to delete file: " + wcharToString(fileToDelete);
+            std::cout << result << '\n';
         }
         return result;
     }
@@ -219,24 +221,32 @@ namespace WinAPI {
             std::string str = wcharToString(folderPath);
             result = "Folder created (or already exists): " + str;
         } else {
-            std::cout << "Failed to create folder: " << wcharToString(folderPath) << '\n';
+            result = "Failed to create folder: " + wcharToString(folderPath);
+            std::cout << result << '\n';
         }
         return result;
     }
 
     bool WinAPI::copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder) {
+        std::filesystem::path sourcePath(sourceFolder);
+        std::filesystem::path destPath(destinationFolder);
+
+        // Convert relative paths to absolute paths
+        sourcePath = std::filesystem::absolute(sourcePath);
+        destPath = std::filesystem::absolute(destPath) / sourcePath.filename();
+
         WIN32_FIND_DATAW findFileData;
         wchar_t sourceSearchPath[MAX_PATH];
-        swprintf(sourceSearchPath, MAX_PATH, L"%s\\*.*", sourceFolder);
+        swprintf(sourceSearchPath, MAX_PATH, L"%s\\*.*", sourcePath.c_str());
 
         HANDLE hFind = FindFirstFileW(sourceSearchPath, &findFileData);
         if (hFind == INVALID_HANDLE_VALUE) {
-            std::cout << "Failed to open source folder: " << sourceFolder << '\n';
+            std::wcout << L"Failed to open source folder: " << sourcePath << '\n';
             return false;
         }
 
         // Create destination folder
-        if (!CreateDirectoryW(destinationFolder, nullptr) || GetLastError() != ERROR_ALREADY_EXISTS) {
+        if (!CreateDirectoryW(destPath.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS) {
             FindClose(hFind);
             return false;
         }
@@ -249,21 +259,18 @@ namespace WinAPI {
                 continue;
             }
 
-            wchar_t sourcePath[MAX_PATH];
-            wchar_t destPath[MAX_PATH];
-            swprintf(sourcePath, MAX_PATH, L"%s\\%s", sourceFolder, fileName);
-            swprintf(destPath, MAX_PATH, L"%s\\%s", destinationFolder, fileName);
+            std::filesystem::path sourceFilePath = sourcePath / fileName;
+            std::filesystem::path destFilePath = destPath / fileName;
 
             if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                 // Recursively copy subfolder
-                if (!copyFolder(sourcePath, destPath)) {
+                if (!copyFolder(sourceFilePath.c_str(), destFilePath.c_str())) {
                     FindClose(hFind);
                     return false;
                 }
-            }
-            else {
+            } else {
                 // Copy file
-                if (!CopyFileW(sourcePath, destPath, FALSE)) {
+                if (!CopyFileW(sourceFilePath.c_str(), destFilePath.c_str(), FALSE)) {
                     FindClose(hFind);
                     return false;
                 }

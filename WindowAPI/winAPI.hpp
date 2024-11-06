@@ -7,6 +7,7 @@
 #include <sstream>
 #include <time.h>
 #include <iomanip>
+#include <filesystem>
 #include <windows.h>
 #include <atlimage.h>
 #include <gdiplus.h>

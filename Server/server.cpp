@@ -18,11 +18,11 @@ void handleClientConnection(ServerSocket &server, SOCKET &clientSocket) {
         bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
         if (bytesReceived > 0) {
             buffer[bytesReceived] = '\0';
-            std::cout << "\t-> Response from client: " << buffer << '\n';
+            std::cout << "\t-> [Response from client] " << buffer << '\n';
             std::string message(buffer);
             server.handleEvent(clientSocket, message);
         } else {
-            std::cerr << "\t-> Failed to receive response from the client.\n";
+            std::cerr << "\t-> [Failed to receive response from the client]\n";
             break;
         }
     }

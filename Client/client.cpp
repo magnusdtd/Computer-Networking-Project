@@ -25,9 +25,9 @@ int main() {
             bytesReceived = recv(client.getSocket(), buffer, sizeof(buffer) - 1, 0);
             if (bytesReceived > 0) {
                 buffer[bytesReceived] = '\0';
-                std::cout << "\t-> Response from server: " << buffer << '\n';
+                std::cout << "\t-> [Response from server] " << buffer << '\n';
             } else {
-                std::cerr << "\t-> Failed to receive response from the server.\n";
+                std::cerr << "\t-> [Failed to receive response from the server]\n";
             }
         }
 

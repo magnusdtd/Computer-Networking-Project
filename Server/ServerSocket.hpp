@@ -32,9 +32,9 @@ private:
     SOCKET serverSocket;
     sockaddr_in serverAddress;
 
-    std::unordered_map<MessageType, std::function<void(SOCKET&)>> handlers;
+    std::unordered_map<MessageType, std::function<void(SOCKET&, const std::string& command)>> handlers;
 
-    MessageType hashMessage(const std::string& message);
+    MessageType hashMessage(const std::string message);
 
     void initializeHandlers();
 
@@ -49,7 +49,7 @@ public:
     void sendIPAddress(SOCKET &clientSocket) {
         const char* ipAddress = SERVER_IP;
         send(clientSocket, ipAddress, static_cast<int>(strlen(ipAddress)), 0);
-        std::cout << "Sending IP address: " << ipAddress << std::endl;
+        std::cout << "Sending IP address: " << ipAddress << '\n';
     }
 
     void sendMessage(SOCKET &clientSocket, const char* message) {
