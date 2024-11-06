@@ -4,7 +4,23 @@ This project is a template for creating socket-based client-server applications 
 
 ## Files and Directories
 
-
+- `.gitignore`: Specifies files and directories to be ignored by Git.
+- `.vscode/`: Contains Visual Studio Code configuration files.
+  - `c_cpp_properties.json`: Configuration for C/C++ IntelliSense.
+  - `launch.json`: Configuration for debugging.
+  - `settings.json`: User and workspace settings.
+  - `tasks.json`: Configuration for task runner.
+- `build/`: Directory for build output.
+- `Client/`: Directory for client source files.
+  - `client.cpp`: Main source file for the client.
+- `CMakeLists.txt`: CMake build configuration file.
+- `GmailAPI/`: Directory for Gmail API related files.
+- `image/`: Directory for image assets.
+- `Readme.md`: Project documentation file.
+- `run.ps1`: PowerShell script to build and run the project.
+- `Server/`: Directory for server source files.
+- `vcpkg/`: Directory for vcpkg package manager.
+- `WindowAPI/`: Directory for Windows API related files.
 
 ## Building the Project
 
@@ -16,6 +32,7 @@ To build the project, follow these steps:
 git clone https://github.com/microsoft/vcpkg.git
 cd vcpkg; 
 .\bootstrap-vcpkg.bat
+.\vcpkg.exe integrate install
 ```
 3. Install dependencies
 ```
@@ -44,7 +61,7 @@ After building the project, you can run the client and server applications:
     ```sh
     ./build/Debug/client.exe
     ```
-An alternative way to run server and client in one comamnd
+An alternative way to run server and client in one command
 
 ```
 .\run.ps1
