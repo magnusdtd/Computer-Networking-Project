@@ -24,13 +24,16 @@ enum MessageType {
     COPY_FILE,
     DELETE_FILE,
     CREATE_FOLDER,
-    COPY_FOLDER
+    COPY_FOLDER,
+    LIST_COMMANDS
 };
 
 class ServerSocket {
 private:
     SOCKET serverSocket;
     sockaddr_in serverAddress;
+
+    static std::unordered_map<std::string, MessageType> messageMap;
 
     std::unordered_map<MessageType, std::function<void(SOCKET&, const std::string& command)>> handlers;
 

@@ -1,5 +1,7 @@
 #include "ServerSocket.hpp"
 
+std::unordered_map<std::string, MessageType> ServerSocket::messageMap;
+
 ServerSocket::ServerSocket() {
     WSADATA wsaSATA;
     if (WSAStartup(MAKEWORD(2, 2), &wsaSATA) != 0) {
@@ -38,10 +40,8 @@ ServerSocket::ServerSocket() {
 
     WinAPI::initializeGDIPlus();
     initializeHandlers();
-}
 
-MessageType ServerSocket::hashMessage(const std::string message) {
-    static const std::unordered_map<std::string, MessageType> messageMap = {
+    messageMap = {
         {"shutdown", SHUTDOWN},
         {"restart", RESTART},
         {"getIP", GET_IP},
@@ -51,9 +51,12 @@ MessageType ServerSocket::hashMessage(const std::string message) {
         {"copy", COPY_FILE},
         {"delete", DELETE_FILE},
         {"createFolder", CREATE_FOLDER},
-        {"copyFolder", COPY_FOLDER}
+        {"copyFolder", COPY_FOLDER},
+        {"ls", LIST_COMMANDS}
     };
+}
 
+MessageType ServerSocket::hashMessage(const std::string message) {
     std::istringstream iss(message);
     std::string command;
     iss >> command;
@@ -162,6 +165,16 @@ void ServerSocket::initializeHandlers()
         bool success = WinAPI::copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
         std::string response = success ? "Folder copied successfully" : "Failed to copy folder";
         this->sendMessage(clientSocket, response.c_str());
+    };
+
+    handlers[LIST_COMMANDS] = [this](SOCKET& clientSocket, const std::string& command) {
+        std::string commands = "Available commands: \n\t\t\t\t";
+        for (const auto& pair : messageMap)
+            commands += pair.first + "\n\t\t\t\t";
+        commands.pop_back();
+        commands.pop_back();
+        commands.pop_back();
+        this->sendMessage(clientSocket, commands.c_str());
     };
 }
 
