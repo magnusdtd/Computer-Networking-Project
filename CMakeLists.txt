@@ -17,23 +17,31 @@ find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-# Add the server executable
+# Server
 add_executable(server ./Server/server.cpp ./Server/ServerSocket.hpp ./Server/ServerSocket.cpp ./WindowAPI/winAPI.cpp ./WindowAPI/winAPI.hpp)
 
-# Add the client executable
+target_link_libraries(server PRIVATE ws2_32)
+
+# add_custom_command(TARGET server POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy_directory
+#     "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
+#     $<TARGET_FILE_DIR:server>)
+
+
+# Client
 add_executable(client ./Client/client.cpp ./Client/ClientSocket.hpp ./Client/ClientSocket.cpp)
 
-# Link the necessary libraries
-target_link_libraries(server PRIVATE ws2_32)
 target_link_libraries(client PRIVATE ws2_32 nlohmann_json::nlohmann_json CURL::libcurl OpenSSL::SSL)
 
-# Copy necessary DLLs after build
-add_custom_command(TARGET server POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-    $<TARGET_FILE_DIR:server>)
+# add_custom_command(TARGET client POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy_directory
+#     "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
+#     $<TARGET_FILE_DIR:client>)
 
-add_custom_command(TARGET client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-    $<TARGET_FILE_DIR:client>)
+#===============================================================================
+# Google Test
+find_package(GTest REQUIRED)
+
+add_executable(tests ./Tests/test_main.cpp)
+
+target_link_libraries(tests PRIVATE GTest::gtest GTest::gtest_main)
