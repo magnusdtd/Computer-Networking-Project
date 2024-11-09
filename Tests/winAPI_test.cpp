@@ -83,3 +83,36 @@ TEST(WinAPITest, CopyFolder) {
     std::filesystem::remove_all(sourceFolder);
     std::filesystem::remove_all(destFolder);
 }
+
+
+TEST(WinAPITest, ListProcesses) {
+    WinAPI winAPI;
+
+    // Test listProcesses method
+    std::string result = winAPI.listProcesses();
+    EXPECT_EQ(result, "Successfully list all processes.\n");
+
+    // Verify the generated file
+    std::filesystem::path outputDir = "output";
+    EXPECT_TRUE(std::filesystem::exists(outputDir));
+
+    // Find the generated file
+    std::filesystem::path generatedFile;
+    for (const auto& entry : std::filesystem::directory_iterator(outputDir)) {
+        if (entry.path().extension() == ".txt" && entry.path().filename().string().find("process_list_") != std::string::npos) {
+            generatedFile = entry.path();
+            break;
+        }
+    }
+
+    EXPECT_TRUE(!generatedFile.empty());
+    EXPECT_TRUE(std::filesystem::exists(generatedFile));
+
+    // Verify the file is not empty
+    std::ifstream ifs(generatedFile);
+    std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
+    EXPECT_FALSE(content.empty());
+
+    // Clean up
+    std::filesystem::remove(generatedFile);
+}

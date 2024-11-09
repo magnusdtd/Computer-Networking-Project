@@ -298,10 +298,19 @@
         file << szProcessName << L"  (PID: " << processID << L")\n";
     } 
     
-    std::string WinAPI::listProcesses(const std::wstring &filename)
+    std::string WinAPI::listProcesses()
     {
+        // Generate a random file name
+        auto now = std::chrono::system_clock::now();
+        auto now_time_t = std::chrono::system_clock::to_time_t(now);
+        std::stringstream ss;
+        std::tm timeInfo;
+        localtime_s(&timeInfo, &now_time_t);
+        ss << "process_list_" << std::put_time(&timeInfo, "%Y%m%d%H%M%S") << ".txt";
+        std::string fileName = "output/" + ss.str();
+
         std::wstring result;
-        std::wofstream file(filename);
+        std::wofstream file(fileName);
         if (!file.is_open()) {
             result = L"Failed to open file\n";
             std::wcerr << result;

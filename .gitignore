@@ -4,3 +4,4 @@ vcpkg/
 .vscode/
 *.json
 *.png
+output/

@@ -51,7 +51,9 @@ ServerSocket::ServerSocket() : winAPI() {
         {"delete", DELETE_FILE},
         {"createFolder", CREATE_FOLDER},
         {"copyFolder", COPY_FOLDER},
-        {"ls", LIST_COMMANDS}
+        {"ls", LIST_COMMANDS},
+        {"listProcess", LIST_PROCESS},
+        {"listServices", LIST_SERVICES}
     };
 }
 
@@ -164,6 +166,7 @@ void ServerSocket::initializeHandlers()
         std::string result = winAPI.copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
         this->sendMessage(clientSocket, result.c_str());
     };
+    
     handlers[LIST_COMMANDS] = [this](SOCKET& clientSocket, const std::string& command) {
         std::string commands = "Available commands: \n\t\t\t\t";
         for (const auto& pair : messageMap)
@@ -173,6 +176,18 @@ void ServerSocket::initializeHandlers()
         commands.pop_back();
         this->sendMessage(clientSocket, commands.c_str());
     };
+
+    handlers[LIST_PROCESS] = [this](SOCKET& clientSocket, const std::string& command) {
+        system("tasklist > output/process.txt");
+        this->sendMessage(clientSocket, "Done!\n");
+    };
+
+    handlers[LIST_SERVICES] = [this](SOCKET& clientSocket, const std::string& command) {
+        system("net start > output/services.txt");
+        this->sendMessage(clientSocket, "Done!\n");
+
+    };
+
 }
 
 void ServerSocket::handleEvent(SOCKET &clientSocket, const std::string& message) {

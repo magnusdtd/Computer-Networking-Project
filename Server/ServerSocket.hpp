@@ -25,7 +25,10 @@ enum MessageType {
     DELETE_FILE,
     CREATE_FOLDER,
     COPY_FOLDER,
-    LIST_COMMANDS
+    LIST_COMMANDS,
+    LIST_PROCESS,
+    LIST_SERVICES,
+
 };
 
 class ServerSocket {

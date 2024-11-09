@@ -51,6 +51,6 @@ public:
     // Copy an entire folder recursively
     std::string copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder);
 
-    std::string listProcesses(const std::wstring& filename);
+    std::string listProcesses();
 
 };
