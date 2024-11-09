@@ -161,11 +161,9 @@ void ServerSocket::initializeHandlers()
         const std::wstring sourceFolder = std::wstring(tokens[1].begin(), tokens[1].end());
         const std::wstring destinationFolder = std::wstring(tokens[2].begin(), tokens[2].end());
 
-        bool success = winAPI.copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
-        std::string response = success ? "Folder copied successfully" : "Failed to copy folder";
-        this->sendMessage(clientSocket, response.c_str());
+        std::string result = winAPI.copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
+        this->sendMessage(clientSocket, result.c_str());
     };
-
     handlers[LIST_COMMANDS] = [this](SOCKET& clientSocket, const std::string& command) {
         std::string commands = "Available commands: \n\t\t\t\t";
         for (const auto& pair : messageMap)

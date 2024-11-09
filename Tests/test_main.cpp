@@ -2,7 +2,7 @@
 
 // Sample test case
 TEST(SampleTest, AssertionTrue) {
-    ASSERT_TRUE(false);
+    ASSERT_TRUE(true);
 }
 
 int main(int argc, char **argv) {

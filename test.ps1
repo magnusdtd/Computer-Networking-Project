@@ -1,3 +1,10 @@
+Write-Output "Building project ..."
+Write-Output ""
+cmake --build build --target tests
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Build failed."
+    exit $LASTEXITCODE
+}
 Write-Output ""
 Write-Output "Running the project test cases ..."
 Write-Output ""

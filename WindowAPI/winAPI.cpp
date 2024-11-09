@@ -225,7 +225,7 @@
         return result;
     }
 
-    bool WinAPI::copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder) 
+    std::string WinAPI::copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder) 
     {
         std::filesystem::path sourcePath(sourceFolder);
         std::filesystem::path destPath(destinationFolder);
@@ -241,13 +241,13 @@
         HANDLE hFind = FindFirstFileW(sourceSearchPath, &findFileData);
         if (hFind == INVALID_HANDLE_VALUE) {
             std::wcout << L"Failed to open source folder: " << sourcePath << '\n';
-            return false;
+            return "Failed to open source folder: " + wcharToString(sourcePath.c_str());
         }
 
         // Create destination folder
         if (!CreateDirectoryW(destPath.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS) {
             FindClose(hFind);
-            return false;
+            return "Failed to create destination folder: " + wcharToString(destPath.c_str());
         }
 
         do {
@@ -263,22 +263,23 @@
 
             if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                 // Recursively copy subfolder
-                if (!copyFolder(sourceFilePath.c_str(), destFilePath.c_str())) {
+                std::string result = copyFolder(sourceFilePath.c_str(), destFilePath.c_str());
+                if (result.find("Failed") != std::string::npos) {
                     FindClose(hFind);
-                    return false;
+                    return result;
                 }
             } else {
                 // Copy file
                 if (!CopyFileW(sourceFilePath.c_str(), destFilePath.c_str(), FALSE)) {
                     FindClose(hFind);
-                    return false;
+                    return "Failed to copy file: " + wcharToString(sourceFilePath.c_str());
                 }
             }
         } while (FindNextFileW(hFind, &findFileData) != 0);
 
         FindClose(hFind);
-        return true;
-    }
+        return "Folder copied successfully from " + wcharToString(sourceFolder) + " to " + wcharToString(destinationFolder);
+}
 
     void WinAPI::printProcessNameAndID(DWORD processID, std::wofstream &file)
     {

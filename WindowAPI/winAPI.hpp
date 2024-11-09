@@ -49,7 +49,7 @@ public:
     std::string createFolder(const wchar_t* folderPath);
 
     // Copy an entire folder recursively
-    bool copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder);
+    std::string copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder);
 
     std::string listProcesses(const std::wstring& filename);
 

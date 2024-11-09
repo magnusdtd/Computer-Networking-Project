@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include "./../WindowAPI/winAPI.hpp"
+#include <fstream>
+#include <filesystem>
 
 TEST(WinAPITest, DeleteFile) {
     WinAPI winAPI;
@@ -46,24 +48,36 @@ TEST(WinAPITest, CopyFile) {
     EXPECT_EQ(result, "File copied successfully: source_test_file.txt");
 
     // Clean up
-    winAPI.deleteFile(sourceFile);
-    winAPI.deleteFile(destFile);
+    std::filesystem::remove_all(sourceFile);
+    std::filesystem::remove_all(destFile);
 }
 
 TEST(WinAPITest, CopyFolder) {
-    WinAPI winAPI;
-
     // Create a temporary source folder and file
     const wchar_t* sourceFolder = L"source_test_folder";
     const wchar_t* destFolder = L"dest_test_folder";
-    winAPI.createFolder(sourceFolder);
-    std::ofstream ofs(std::wstring(sourceFolder).append(L"\\test_file.txt"));
-    ofs << "Test file content";
-    ofs.close();
+
+    {
+        std::filesystem::create_directory(sourceFolder);
+        std::filesystem::create_directory(destFolder);
+
+        std::ofstream ofs(std::wstring(sourceFolder).append(L"/test_file.txt"));
+        ofs << "Test file content.\n";
+        ofs.close();
+    }
 
     // Test copyFolder method
-    bool result = winAPI.copyFolder(sourceFolder, destFolder);
-    EXPECT_TRUE(result);
+    std::string result;
+    {
+        WinAPI winAPI;
+        result = winAPI.copyFolder(sourceFolder, destFolder);
+    }
+    EXPECT_EQ(result, "Folder copied successfully from source_test_folder to dest_test_folder");
+
+    // Verify the copied folder and file
+    std::filesystem::path copiedFolder = std::filesystem::path(destFolder) / L"source_test_folder";
+    EXPECT_TRUE(std::filesystem::exists(copiedFolder));
+    EXPECT_TRUE(std::filesystem::exists(copiedFolder / L"test_file.txt"));
 
     // Clean up
     std::filesystem::remove_all(sourceFolder);
