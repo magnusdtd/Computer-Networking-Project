@@ -1,8 +1,6 @@
 #include "winAPI.hpp"
 
-namespace WinAPI {
-
-    std::string WinAPI::wcharToString(const wchar_t* wstr) {
+    std::string WinAPI::WinAPI::wcharToString(const wchar_t* wstr) {
         if (!wstr) return "";
 
         int bufferSize = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
@@ -101,14 +99,14 @@ namespace WinAPI {
         return TRUE; 
     }
 
-    void initializeGDIPlus()
+    void WinAPI::initializeGDIPlus()
     {
         Gdiplus::GdiplusStartupInput gdiplusStartupInput;
         ULONG_PTR gdiplusToken;
         Gdiplus::Status status = GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
 
         if (status == Gdiplus::Ok)
-            std::cout << "GDI+ successfully initialized.\n";
+            std::cout << "GDIPlus successfully initialized.\n";
         else
             std::cout << "Failed to initialize GDI+. Status: " << status << "\n";
     }
@@ -194,10 +192,10 @@ namespace WinAPI {
     std::string WinAPI::copyFile(const wchar_t* source, const wchar_t* destination) {
         std::string result;
         if (CopyFileW(source, destination, FALSE)) {
-            std::string str = wcharToString(source);
+            std::string str = WinAPI::wcharToString(source);
             result = "File copied successfully: " + str;
         } else {
-            result = "Failed to copy file: " + wcharToString(source);
+            result = "Failed to copy file: " + WinAPI::wcharToString(source);
             std::cout << result << '\n';
         }
         return result;
@@ -206,10 +204,10 @@ namespace WinAPI {
     std::string WinAPI::deleteFile(const wchar_t* fileToDelete) {
         std::string result;
         if (DeleteFileW(fileToDelete)) {
-            std::string str = wcharToString(fileToDelete);
+            std::string str = WinAPI::wcharToString(fileToDelete);
             result = "File deleted successfully: " + str;
         } else {
-            result = "Failed to delete file: " + wcharToString(fileToDelete);
+            result = "Failed to delete file: " + WinAPI::wcharToString(fileToDelete);
             std::cout << result << '\n';
         }
         return result;
@@ -218,16 +216,17 @@ namespace WinAPI {
     std::string WinAPI::createFolder(const wchar_t* folderPath) {
         std::string result;
         if (CreateDirectoryW(folderPath, nullptr) || GetLastError() == ERROR_ALREADY_EXISTS) {
-            std::string str = wcharToString(folderPath);
+            std::string str = WinAPI::wcharToString(folderPath);
             result = "Folder created (or already exists): " + str;
         } else {
-            result = "Failed to create folder: " + wcharToString(folderPath);
+            result = "Failed to create folder: " + WinAPI::wcharToString(folderPath);
             std::cout << result << '\n';
         }
         return result;
     }
 
-    bool WinAPI::copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder) {
+    bool WinAPI::copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder) 
+    {
         std::filesystem::path sourcePath(sourceFolder);
         std::filesystem::path destPath(destinationFolder);
 
@@ -280,4 +279,45 @@ namespace WinAPI {
         FindClose(hFind);
         return true;
     }
-}
+
+    void WinAPI::printProcessNameAndID(DWORD processID, std::wofstream &file)
+    {
+        TCHAR szProcessName[MAX_PATH] = TEXT("<unknown>");
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processID);
+
+        if (hProcess != NULL) {
+            HMODULE hMod;
+            DWORD cbNeeded;
+            if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded)) {
+                GetModuleBaseName(hProcess, hMod, szProcessName, sizeof(szProcessName) / sizeof(TCHAR));
+            }
+            CloseHandle(hProcess);
+        }
+
+        file << szProcessName << L"  (PID: " << processID << L")\n";
+    } 
+    
+    std::string WinAPI::listProcesses(const std::wstring &filename)
+    {
+        std::wstring result;
+        std::wofstream file(filename);
+        if (!file.is_open()) {
+            result = L"Failed to open file\n";
+            std::wcerr << result;
+            return WinAPI::wcharToString(result.c_str());
+        }
+
+        DWORD aProcesses[1024], cbNeeded, cProcesses;
+        if (!EnumProcesses(aProcesses, sizeof(aProcesses), &cbNeeded)) {
+            result = L"Failed to enumerate processes\n";
+            std::wcerr << result;
+            return WinAPI::wcharToString(result.c_str());
+        }
+
+        cProcesses = cbNeeded / sizeof(DWORD);
+        for (unsigned int i = 0; i < cProcesses; i++)
+            if (aProcesses[i] != 0)
+                printProcessNameAndID(aProcesses[i], file);
+
+        return WinAPI::wcharToString(L"Successfully list all processes.\n");
+    }

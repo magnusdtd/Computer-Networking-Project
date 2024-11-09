@@ -11,20 +11,30 @@
 #include <windows.h>
 #include <atlimage.h>
 #include <gdiplus.h>
+#include <psapi.h>
+#include <tchar.h>
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "advapi32.lib")
 #pragma comment(lib, "gdiplus.lib")
 
-namespace WinAPI {
+class WinAPI {
 
     std::string wcharToString(const wchar_t* wstr);
+
+    void initializeGDIPlus();
+
+    void printProcessNameAndID(DWORD processID, std::wofstream& file);
+
+public:
+
+    WinAPI() {
+        initializeGDIPlus();
+    }
 
     BOOL systemShutdown();
 
     BOOL systemRestart(LPWSTR lpMsg);
-
-    void initializeGDIPlus();
 
     // Capture and save screenshot
     std::string saveScreenshot();
@@ -40,4 +50,7 @@ namespace WinAPI {
 
     // Copy an entire folder recursively
     bool copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder);
-}
+
+    std::string listProcesses(const std::wstring& filename);
+
+};

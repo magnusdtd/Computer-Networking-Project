@@ -2,7 +2,7 @@
 
 std::unordered_map<std::string, MessageType> ServerSocket::messageMap;
 
-ServerSocket::ServerSocket() {
+ServerSocket::ServerSocket() : winAPI() {
     WSADATA wsaSATA;
     if (WSAStartup(MAKEWORD(2, 2), &wsaSATA) != 0) {
         std::cerr << "WSAStartup failed.\n";
@@ -38,7 +38,6 @@ ServerSocket::ServerSocket() {
 
     std::cout << "Server is listening on port " << PORT << "...\n";
 
-    WinAPI::initializeGDIPlus();
     initializeHandlers();
 
     messageMap = {
@@ -67,13 +66,13 @@ MessageType ServerSocket::hashMessage(const std::string message) {
 
 void ServerSocket::initializeHandlers()
 {
-    handlers[SHUTDOWN] = [](SOCKET&, const std::string& command) { 
-        WinAPI::systemShutdown(); 
+    handlers[SHUTDOWN] = [this](SOCKET&, const std::string& command) { 
+        winAPI.systemShutdown(); 
     };
 
-    handlers[RESTART] = [](SOCKET&, const std::string& command) { 
+    handlers[RESTART] = [this](SOCKET&, const std::string& command) { 
         LPWSTR restartMessage = L"RESTART"; 
-        WinAPI::systemRestart(restartMessage); 
+        winAPI.systemRestart(restartMessage); 
     };
 
     handlers[GET_IP] = [this](SOCKET& clientSocket, const std::string& command) { 
@@ -92,7 +91,7 @@ void ServerSocket::initializeHandlers()
     };
 
     handlers[CAPTURE_SCREEN] = [this](SOCKET& clientSocket, const std::string& command) {
-        std::string result = WinAPI::saveScreenshot();
+        std::string result = winAPI.saveScreenshot();
         std::string response = (result.substr(0, 6) != "Failed") ? "Capture screen successful, new file: " + result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());
     };
@@ -110,7 +109,7 @@ void ServerSocket::initializeHandlers()
         const std::wstring source = std::wstring(tokens[1].begin(), tokens[1].end());
         const std::wstring destination = std::wstring(tokens[2].begin(), tokens[2].end());
 
-        std::string result = WinAPI::copyFile(source.c_str(), destination.c_str());
+        std::string result = winAPI.copyFile(source.c_str(), destination.c_str());
         std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());
     };
@@ -127,7 +126,7 @@ void ServerSocket::initializeHandlers()
 
         const std::wstring source = std::wstring(tokens[1].begin(), tokens[1].end());
 
-        std::string result = WinAPI::deleteFile(source.c_str());
+        std::string result = winAPI.deleteFile(source.c_str());
         std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());   
     };
@@ -144,7 +143,7 @@ void ServerSocket::initializeHandlers()
 
         const std::wstring folderPath = std::wstring(tokens[1].begin(), tokens[1].end());
 
-        std::string result = WinAPI::createFolder(folderPath.c_str());
+        std::string result = winAPI.createFolder(folderPath.c_str());
         std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());
     };
@@ -162,7 +161,7 @@ void ServerSocket::initializeHandlers()
         const std::wstring sourceFolder = std::wstring(tokens[1].begin(), tokens[1].end());
         const std::wstring destinationFolder = std::wstring(tokens[2].begin(), tokens[2].end());
 
-        bool success = WinAPI::copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
+        bool success = winAPI.copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
         std::string response = success ? "Folder copied successfully" : "Failed to copy folder";
         this->sendMessage(clientSocket, response.c_str());
     };

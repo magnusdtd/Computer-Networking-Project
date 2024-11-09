@@ -41,6 +41,8 @@ private:
 
     void initializeHandlers();
 
+    WinAPI winAPI;
+
 public:
     ServerSocket();
 

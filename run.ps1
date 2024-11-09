@@ -8,7 +8,7 @@ Write-Output ""
 # Run cmake build command
 Write-Output "Building project ..."
 Write-Output ""
-cmake --build build
+cmake --build build --target server client
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Build failed."
     exit $LASTEXITCODE
