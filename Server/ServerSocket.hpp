@@ -46,6 +46,8 @@ private:
 
     WinAPI winAPI;
 
+    std::string response;
+
 public:
     ServerSocket();
 
