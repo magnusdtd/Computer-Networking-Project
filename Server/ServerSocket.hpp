@@ -28,6 +28,9 @@ enum MessageType {
     LIST_COMMANDS,
     LIST_PROCESS,
     LIST_SERVICES,
+    START_APP,
+    TERMINATE_PROCESS,
+    LIST_APP,
 
 };
 

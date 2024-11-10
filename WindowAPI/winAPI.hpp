@@ -13,6 +13,8 @@
 #include <gdiplus.h>
 #include <psapi.h>
 #include <tchar.h>
+#include <shellapi.h>
+#include <tlhelp32.h>
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "advapi32.lib")
@@ -55,5 +57,12 @@ public:
     std::string copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder);
 
     std::string listProcesses();
+
+    std::string StartApplication();
+
+    std::string TerminateProcessByID();
+
+    //app = process has a visiable window
+    std::string listApp();
 
 };
