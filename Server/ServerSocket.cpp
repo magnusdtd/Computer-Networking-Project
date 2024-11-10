@@ -53,7 +53,10 @@ ServerSocket::ServerSocket() : winAPI() {
         {"copyFolder", COPY_FOLDER},
         {"ls", LIST_COMMANDS},
         {"listProcess", LIST_PROCESS},
-        {"listServices", LIST_SERVICES}
+        {"listServices", LIST_SERVICES},
+        {"startApp", START_APP},
+        {"terminateProcess", TERMINATE_PROCESS},
+        {"listApp", LIST_APP},
     };
 }
 
@@ -187,6 +190,22 @@ void ServerSocket::initializeHandlers()
         this->sendMessage(clientSocket, "Done!\n");
 
     };
+
+    handlers[START_APP] = [this](SOCKET& clientSocket, const std::string& command) {
+        std::string result = winAPI.StartApplication();
+        this->sendMessage(clientSocket, result.c_str());
+    };
+
+    handlers[TERMINATE_PROCESS] = [this](SOCKET& clientSocket, const std::string& command) {
+        std::string result = winAPI.TerminateProcessByID();
+        this->sendMessage(clientSocket, result.c_str());
+    };
+
+    handlers[LIST_APP] = [this](SOCKET& clientSocket, const std::string& command) {
+        std::string result = winAPI.listApp();
+        this->sendMessage(clientSocket, result.c_str());
+    };
+
 
 }
 
