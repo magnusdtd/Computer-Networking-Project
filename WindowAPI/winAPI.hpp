@@ -34,6 +34,9 @@ public:
         initializeGDIPlus();
     }
 
+    // Generate a unique file name using the current time
+    std::string generateName(const std::string prefixName, const std::string extensionName);
+
     BOOL systemShutdown();
 
     BOOL systemRestart(LPWSTR lpMsg);
