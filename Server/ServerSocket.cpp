@@ -53,7 +53,7 @@ ServerSocket::ServerSocket() : winAPI() {
         {"copyFolder", COPY_FOLDER},
         {"ls", LIST_COMMANDS},
         {"listProcess", LIST_PROCESS},
-        {"listServices", LIST_SERVICES},
+        {"listService", LIST_SERVICES},
         {"startApp", START_APP},
         {"terminateProcess", TERMINATE_PROCESS},
         {"listApp", LIST_APP},
@@ -71,37 +71,43 @@ MessageType ServerSocket::hashMessage(const std::string message) {
 
 void ServerSocket::initializeHandlers()
 {
-    handlers[SHUTDOWN] = [this](SOCKET&, const std::string& command) { 
+    handlers[SHUTDOWN] = [this](SOCKET &clientSocket, const std::string& command) { 
+        response = "Trying to shutdown server!\n";
+        this->sendMessage(clientSocket, response.c_str());
+
         winAPI.systemShutdown(); 
     };
 
-    handlers[RESTART] = [this](SOCKET&, const std::string& command) { 
+    handlers[RESTART] = [this](SOCKET &clientSocket, const std::string& command) { 
+        response = "Trying to restart server!\n";
+        this->sendMessage(clientSocket, response.c_str());
+
         LPWSTR restartMessage = L"RESTART"; 
         winAPI.systemRestart(restartMessage); 
     };
 
-    handlers[GET_IP] = [this](SOCKET& clientSocket, const std::string& command) { 
+    handlers[GET_IP] = [this](SOCKET &clientSocket, const std::string& command) { 
         this->sendIPAddress(clientSocket); 
     };
 
-    handlers[HELLO_SERVER] = [this](SOCKET& clientSocket, const std::string& command) {
-        std::string response = "Hello from server!";
+    handlers[HELLO_SERVER] = [this](SOCKET &clientSocket, const std::string& command) {
+        response = "Hello from server!\n";
         this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[STOP] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[STOP] = [this](SOCKET &clientSocket, const std::string& command) {
         this->~ServerSocket();
         closesocket(clientSocket);
         exit(0);
     };
 
-    handlers[CAPTURE_SCREEN] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[CAPTURE_SCREEN] = [this](SOCKET &clientSocket, const std::string& command) {
         std::string result = winAPI.saveScreenshot();
-        std::string response = (result.substr(0, 6) != "Failed") ? "Capture screen successful, new file: " + result : "Error: " + result;
+        response = (result.substr(0, 6) != "Failed") ? "Capture screen successful, new file: " + result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[COPY_FILE] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[COPY_FILE] = [this](SOCKET &clientSocket, const std::string& command) {
         std::istringstream iss(command);
         std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
 
@@ -113,9 +119,9 @@ void ServerSocket::initializeHandlers()
 
         const std::wstring source = std::wstring(tokens[1].begin(), tokens[1].end());
         const std::wstring destination = std::wstring(tokens[2].begin(), tokens[2].end());
-
+ 
         std::string result = winAPI.copyFile(source.c_str(), destination.c_str());
-        std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
+        response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());
     };
 
@@ -132,11 +138,11 @@ void ServerSocket::initializeHandlers()
         const std::wstring source = std::wstring(tokens[1].begin(), tokens[1].end());
 
         std::string result = winAPI.deleteFile(source.c_str());
-        std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
+        response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());   
     };
 
-    handlers[CREATE_FOLDER] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[CREATE_FOLDER] = [this](SOCKET &clientSocket, const std::string& command) {
         std::istringstream iss(command);
         std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
 
@@ -149,11 +155,11 @@ void ServerSocket::initializeHandlers()
         const std::wstring folderPath = std::wstring(tokens[1].begin(), tokens[1].end());
 
         std::string result = winAPI.createFolder(folderPath.c_str());
-        std::string response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
+        response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
         this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[COPY_FOLDER] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[COPY_FOLDER] = [this](SOCKET &clientSocket, const std::string& command) {
         std::istringstream iss(command);
         std::vector<std::string> tokens{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
 
@@ -167,10 +173,11 @@ void ServerSocket::initializeHandlers()
         const std::wstring destinationFolder = std::wstring(tokens[2].begin(), tokens[2].end());
 
         std::string result = winAPI.copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
+        response = (result.substr(0, 6) != "Failed") ? result : "Error: " + result;
         this->sendMessage(clientSocket, result.c_str());
     };
     
-    handlers[LIST_COMMANDS] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[LIST_COMMANDS] = [this](SOCKET &clientSocket, const std::string& command) {
         std::string commands = "Available commands: \n\t\t\t\t";
         for (const auto& pair : messageMap)
             commands += pair.first + "\n\t\t\t\t";
@@ -180,28 +187,39 @@ void ServerSocket::initializeHandlers()
         this->sendMessage(clientSocket, commands.c_str());
     };
 
-    handlers[LIST_PROCESS] = [this](SOCKET& clientSocket, const std::string& command) {
-        system("tasklist > output/process.txt");
-        this->sendMessage(clientSocket, "Done!\n");
+    handlers[LIST_PROCESS] = [this](SOCKET &clientSocket, const std::string& command) {
+        std::string fileName = winAPI.generateName("process_list", "txt");
+        std::string filePath = "./output/" + fileName;
+        std::string systemCommand = "tasklist > " + filePath;
+        int result = system(systemCommand.c_str());
+
+        response = (result != 0) ? "Error: Command execution failed with exit code: " + std::to_string(result) : "Successfully list all processes at " + filePath;
+        result += '\n';
+        this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[LIST_SERVICES] = [this](SOCKET& clientSocket, const std::string& command) {
-        system("net start > output/services.txt");
-        this->sendMessage(clientSocket, "Done!\n");
+    handlers[LIST_SERVICES] = [this](SOCKET &clientSocket, const std::string& command) {
+        std::string fileName = winAPI.generateName("services_list", "txt");
+        std::string filePath = "./output/" + fileName;
+        std::string systemCommand = "net start > " + filePath;
+        int result = system(systemCommand.c_str());
 
+        response = (result != 0) ? "Error: Command execution failed with exit code: " + std::to_string(result) : "Successfully list all services at " + filePath;
+        result += '\n';
+        this->sendMessage(clientSocket, response.c_str());
     };
 
-    handlers[START_APP] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[START_APP] = [this](SOCKET &clientSocket, const std::string& command) {
         std::string result = winAPI.StartApplication();
         this->sendMessage(clientSocket, result.c_str());
     };
 
-    handlers[TERMINATE_PROCESS] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[TERMINATE_PROCESS] = [this](SOCKET &clientSocket, const std::string& command) {
         std::string result = winAPI.TerminateProcessByID();
         this->sendMessage(clientSocket, result.c_str());
     };
 
-    handlers[LIST_APP] = [this](SOCKET& clientSocket, const std::string& command) {
+    handlers[LIST_APP] = [this](SOCKET &clientSocket, const std::string& command) {
         std::string result = winAPI.listApp();
         this->sendMessage(clientSocket, result.c_str());
     };
