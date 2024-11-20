@@ -286,33 +286,33 @@ std::string WinAPI::copyFolder(const wchar_t* sourceFolder, const wchar_t* desti
     return "Folder copied successfully from " + wcharToString(sourceFolder) + " to " + wcharToString(destinationFolder);
 }
 
-std::string WinAPI::StartApplication(){
-    LPCWSTR path = L"C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE";
-    HINSTANCE result = ShellExecuteW(NULL, L"open", path, NULL, NULL, SW_SHOWNORMAL);
-    if ((intptr_t)result <= 32)
-    {
-        std::wcerr << L"Failed to start Microsoft Word. Error code: " << (intptr_t)result << std::endl;
-        return "";
+std::string WinAPI::StartApplication(const std::wstring& applicationPath) {
+    HINSTANCE result = ShellExecuteW(NULL, L"open", applicationPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    if ((intptr_t)result <= 32) {
+        std::wcerr << L"Failed to start application. Error code: " << (intptr_t)result << std::endl;
+        return "Failed";
     }
-    return "Successed";
+    return "Succeeded start application with path: " + wcharToString(applicationPath.c_str());
 }
 
-std::string WinAPI::TerminateProcessByID(){
-    DWORD processID;
-    std::cout << "Enter ProcessID: ";
-    std::cin >> processID;
+std::string WinAPI::TerminateProcessByID(DWORD processID) {
     HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, processID);
-    if (hProcess == NULL) {
-        std::cerr << "Failed to open process with ID " << processID << std::endl;
+    std::string result = "Succeeded to close process with ID: " + std::to_string(processID) + '\n';
+    if (hProcess == nullptr) {
+        result = "Failed to open process with ID " + std::to_string(processID) + "\n";
+        std::cerr << result;
+        return result;
+    }
+
+    if (!TerminateProcess(hProcess, 0)) {
+        result = "Failed to terminate process " + std::to_string(processID) + "\n";
+        std::cerr << result;
+        CloseHandle(hProcess);
         return "Failed";
     }
 
-    if (!TerminateProcess(hProcess, 0)){
-        std::cerr << "Failed to terminate process " << processID << std::endl;
-    }
-
     CloseHandle(hProcess);
-    return "Successed";
+    return result;
 }
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
@@ -329,38 +329,136 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
     return TRUE;  // Continue enumeration
 }
 
-std::string WinAPI::listApp(){ 
-    std::ofstream out("apps.txt");
+std::string WinAPI::listRunningApp(std::string &filePath)
+{
+    std::ofstream out(filePath);
+    if (!out.is_open()) {
+        std::cerr << "Failed to open output file: " << filePath << '\n';
+        return "Failed to open output file!";
+    }
+
+    std::string result;
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) {
-        std::cerr << "Failed to create snapshot!" << std::endl;
-        return "Failed";
+        result = "Failed to create snapshot!\n";
+        std::cerr << result;
+        return result;
     }
 
     PROCESSENTRY32 pe;
     pe.dwSize = sizeof(PROCESSENTRY32);
 
-
     if (Process32First(snapshot, &pe)) {
         do {
             DWORD processId = pe.th32ProcessID;
-
-
             if (processId != 0) { 
-                
                 BOOL hasWindow = EnumWindows(EnumWindowsProc, (LPARAM)processId);
                 if (!hasWindow) {
-                    out << L"Process ID: " << processId << L" - " << pe.szExeFile << std::endl;
+                    out << "Process ID: " << processId << " - " << pe.szExeFile << '\n';
                 }
             }
-
         } while (Process32Next(snapshot, &pe));
     }
     else {
-        std::cerr << "Failed to retrieve process information!" << std::endl;
+        result = "Failed to retrieve process information!\n";
+        std::cerr << result;
+        return result;
     }
 
     CloseHandle(snapshot);
     out.close();
-    return "Sucessed";
+    result = "Successfully listed all running applications at " + filePath;
+    return result;
+}
+
+std::string WinAPI::listInstalledApp(std::string &filePath)
+{
+    std::ofstream out(filePath);
+
+    if (!out.is_open()) {
+        std::cerr << "Failed to open output file: " << filePath << '\n';
+        return "Failed to open output file!";
+    }
+
+    std::string result;
+    HKEY hKey;
+    const char* subKeys[] = {
+        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+        "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+    };
+
+    for (const char* subKey : subKeys) {
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, subKey, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+            DWORD index = 0;
+            char keyName[256];
+            DWORD keyNameSize = sizeof(keyName);
+
+            while (RegEnumKeyExA(hKey, index, keyName, &keyNameSize, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+                HKEY hSubKey;
+                if (RegOpenKeyExA(hKey, keyName, 0, KEY_READ, &hSubKey) == ERROR_SUCCESS) {
+                    char displayName[256];
+                    char installLocation[256];
+                    char uninstallString[256];
+                    DWORD displayNameSize = sizeof(displayName);
+                    DWORD installLocationSize = sizeof(installLocation);
+                    DWORD uninstallStringSize = sizeof(uninstallString);
+
+                    if (RegQueryValueExA(hSubKey, "DisplayName", nullptr, nullptr, (LPBYTE)displayName, &displayNameSize) == ERROR_SUCCESS) {
+                        if (RegQueryValueExA(hSubKey, "InstallLocation", nullptr, nullptr, (LPBYTE)installLocation, &installLocationSize) != ERROR_SUCCESS) {
+                            strcpy_s(installLocation, "Unknown");
+                        }
+                        if (RegQueryValueExA(hSubKey, "UninstallString", nullptr, nullptr, (LPBYTE)uninstallString, &uninstallStringSize) != ERROR_SUCCESS) {
+                            strcpy_s(uninstallString, "Unknown");
+                        }
+
+                        std::string exePath = installLocation;
+                        if (exePath == "Unknown" || exePath.empty()) {
+                            exePath = uninstallString;
+                        }
+
+                        out << "Application: " << displayName << " - Path: " << exePath << '\n';
+                    }
+                    RegCloseKey(hSubKey);
+                }
+                keyNameSize = sizeof(keyName);
+                index++;
+            }
+            RegCloseKey(hKey);
+        } else {
+            std::cerr << "Failed to open registry key: " << subKey << '\n';
+        }
+    }
+
+    out.close();
+    result = "Successfully listed all installed applications at " + filePath;
+    return result;
+}
+
+std::string WinAPI::listFilesInDirectory(const std::wstring& directoryPath, std::string& filePath) {
+    std::ofstream out(filePath);
+
+    if (!out.is_open()) {
+        std::cerr << "Failed to open output file: " << filePath << '\n';
+        return "Failed to open output file!";
+    }
+
+    WIN32_FIND_DATAW findFileData;
+    HANDLE hFind = FindFirstFileW((directoryPath + L"\\*").c_str(), &findFileData);
+
+    if (hFind == INVALID_HANDLE_VALUE) {
+        std::cerr << "Failed to open directory: " << wcharToString(directoryPath.c_str()) << '\n';
+        return "Failed to open directory!";
+    }
+
+    do {
+        const std::wstring fileName = findFileData.cFileName;
+        if (fileName != L"." && fileName != L"..") {
+            out << "File: " << wcharToString(fileName.c_str()) << '\n';
+        }
+    } while (FindNextFileW(hFind, &findFileData) != 0);
+
+    FindClose(hFind);
+    out.close();
+
+    return "Successfully listed all files in directory at " + filePath;
 }

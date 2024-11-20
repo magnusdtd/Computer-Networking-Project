@@ -26,8 +26,6 @@ class WinAPI {
 
     void initializeGDIPlus();
 
-    void printProcessNameAndID(DWORD processID, std::wofstream& file);
-
 public:
 
     WinAPI() {
@@ -56,13 +54,15 @@ public:
     // Copy an entire folder recursively
     std::string copyFolder(const wchar_t* sourceFolder, const wchar_t* destinationFolder);
 
-    std::string listProcesses();
+    std::string StartApplication(const std::wstring& applicationPath);
 
-    std::string StartApplication();
-
-    std::string TerminateProcessByID();
+    std::string TerminateProcessByID(DWORD processID);
 
     //app = process has a visiable window
-    std::string listApp();
+    std::string listRunningApp(std::string &filePath);
+
+    std::string listInstalledApp(std::string &filePath);
+
+    std::string WinAPI::listFilesInDirectory(const std::wstring &directoryPath, std::string &filePath);
 
 };

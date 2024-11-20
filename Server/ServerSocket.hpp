@@ -30,8 +30,9 @@ enum MessageType {
     LIST_SERVICES,
     START_APP,
     TERMINATE_PROCESS,
-    LIST_APP,
-
+    LIST_RUNNING_APP,
+    LIST_INSTALLED_APP,
+    LIST_FILES
 };
 
 class ServerSocket {
@@ -58,6 +59,10 @@ public:
         closesocket(serverSocket);
         WSACleanup();
     }
+
+    std::vector<std::string> parseCommand(const std::string &command);
+
+    void sendResponse(SOCKET &clientSocket, const std::string& response);  
 
     void sendIPAddress(SOCKET &clientSocket) {
         const char* ipAddress = SERVER_IP;
