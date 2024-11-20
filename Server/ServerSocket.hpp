@@ -3,6 +3,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <functional>
+#include <limits>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <tchar.h>
@@ -80,5 +81,5 @@ public:
 
     void handleEvent(SOCKET &clientSocket, const std::string& message);
 
-    
+    void sendFile(SOCKET &clientSocket, const std::string& filePath);
 };

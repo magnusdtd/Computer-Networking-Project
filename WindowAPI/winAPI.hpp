@@ -40,7 +40,7 @@ public:
     BOOL systemRestart(LPWSTR lpMsg);
 
     // Capture and save screenshot
-    std::string saveScreenshot();
+    std::string saveScreenshot(const std::string&  filePath);
 
     // Copy a single file  at source to the given destination
     std::string copyFile(const wchar_t* source, const wchar_t* destination);

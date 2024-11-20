@@ -122,7 +122,7 @@ void WinAPI::initializeGDIPlus()
         std::cout << "Failed to initialize GDI+. Status: " << status << "\n";
 }
 
-std::string WinAPI::saveScreenshot() 
+std::string WinAPI::saveScreenshot(const std::string& filePath) 
 {
     HWND hwnd = GetDesktopWindow();
     HDC hdcWindow = GetDC(hwnd);
@@ -173,9 +173,6 @@ std::string WinAPI::saveScreenshot()
     IStream_Read(stream, &buf[0], len);
     stream->Release();
 
-    std::string fileName = generateName("screenshot", "png");
-    std::string filePath = "./image/" + fileName;
-
     std::fstream fileBuffer;
     fileBuffer.open(filePath, std::fstream::binary | std::fstream::out);
     if (!fileBuffer.is_open()) {
@@ -191,7 +188,7 @@ std::string WinAPI::saveScreenshot()
     DeleteObject(hBitmap);
     DeleteDC(hdcMemDC);
 
-    return filePath;
+    return "Capture screen successful, new file at " + filePath ;
 }
 
 std::string WinAPI::copyFile(const wchar_t* source, const wchar_t* destination) {

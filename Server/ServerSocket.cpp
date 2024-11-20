@@ -107,8 +107,16 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[CAPTURE_SCREEN] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string result = winAPI.saveScreenshot();
-        sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? "Capture screen successful, new file: " + result : "Error: " + result);
+        std::string fileName = winAPI.generateName("screenshot", "png");
+        std::string filePath = "./output-server/" + fileName;
+        std::string result = winAPI.saveScreenshot(filePath);
+        if (result.substr(0, 6) != "Failed") {
+            sendResponse(clientSocket, result);
+            sendFile(clientSocket, filePath);
+        } else {
+            sendResponse(clientSocket, "Error: " + result);
+            return;
+        }
     };
 
     handlers[COPY_FILE] = [this](SOCKET &clientSocket, const std::string& command) {
@@ -173,20 +181,27 @@ void ServerSocket::initializeHandlers() {
 
     handlers[LIST_PROCESS] = [this](SOCKET &clientSocket, const std::string& command) {
         std::string fileName = winAPI.generateName("process_list", "txt");
-        std::string filePath = "./output/" + fileName;
+        std::string filePath = "./output-server/" + fileName;
         std::string systemCommand = "tasklist > " + filePath;
         int result = system(systemCommand.c_str());
 
-        sendResponse(clientSocket, (result != 0) ? "Error: Command execution failed with exit code: " + std::to_string(result) : "Successfully list all processes at " + filePath);
+        if (result != 0) {
+            sendResponse(clientSocket, "Error: Command execution failed with exit code: " + std::to_string(result));
+        } else {
+            sendResponse(clientSocket, "Successfully list all processes at " + filePath);
+            sendFile(clientSocket, filePath);
+        }
     };
 
     handlers[LIST_SERVICES] = [this](SOCKET &clientSocket, const std::string& command) {
         std::string fileName = winAPI.generateName("services_list", "txt");
-        std::string filePath = "./output/" + fileName;
+        std::string filePath = "./output-server/" + fileName;
         std::string systemCommand = "net start > " + filePath;
         int result = system(systemCommand.c_str());
 
         sendResponse(clientSocket, (result != 0) ? "Error: Command execution failed with exit code: " + std::to_string(result) : "Successfully list all services at " + filePath);
+
+        sendFile(clientSocket, filePath);
     };
 
     handlers[START_APP] = [this](SOCKET &clientSocket, const std::string& command) {
@@ -215,16 +230,28 @@ void ServerSocket::initializeHandlers() {
 
     handlers[LIST_INSTALLED_APP] = [this](SOCKET &clientSocket, const std::string& command) {
         std::string fileName = winAPI.generateName("installed_app_list", "txt");
-        std::string filePath = "./output/" + fileName;
+        std::string filePath = "./output-server/" + fileName;
         std::string result = winAPI.listInstalledApp(filePath);
-        sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? result : "Error: " + result);
+        if (result.substr(0, 6) != "Failed") {
+            sendResponse(clientSocket, result);
+            sendFile(clientSocket, filePath);
+        } else {
+            sendResponse(clientSocket, "Error: " + result);
+            return;
+        }
     };
 
     handlers[LIST_RUNNING_APP] = [this](SOCKET &clientSocket, const std::string &command) {
         std::string fileName = winAPI.generateName("running_app_list", "txt");
-        std::string filePath = "./output/" + fileName;
+        std::string filePath = "./output-server/" + fileName;
         std::string result = winAPI.listRunningApp(filePath);
-        sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? result : "Error: " + result);
+        if (result.substr(0, 6) != "Failed") {
+            sendResponse(clientSocket, result);
+            sendFile(clientSocket, filePath);
+        } else {
+            sendResponse(clientSocket, "Error: " + result);
+            return;
+        }
     };
 
     handlers[LIST_FILES] = [this](SOCKET &clientSocket, const std::string& command) {
@@ -235,9 +262,15 @@ void ServerSocket::initializeHandlers() {
         }
         const std::wstring directoryPath = std::wstring(command.begin() + command.find(' ') + 1, command.end());
         std::string fileName = winAPI.generateName("file_list", "txt");
-        std::string filePath = "./output/" + fileName;
+        std::string filePath = "./output-server/" + fileName;
         std::string result = winAPI.listFilesInDirectory(directoryPath, filePath);
-        sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? result : "Error: " + result);
+        if (result.substr(0, 6) != "Failed") {
+            sendResponse(clientSocket, result);
+            sendFile(clientSocket, filePath);
+        } else {
+            sendResponse(clientSocket, "Error: " + result);
+            return;
+        }
     };
 }
 
@@ -249,4 +282,37 @@ void ServerSocket::handleEvent(SOCKET &clientSocket, const std::string& message)
     } else {
         sendResponse(clientSocket, "INVALID MESSAGE");
     }
+}
+
+void ServerSocket::sendFile(SOCKET &clientSocket, const std::string &filePath)
+{
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        sendResponse(clientSocket, "Error: Could not open file " + filePath);
+        return;
+    }
+
+    // Send file size
+    file.seekg(0, std::ios::end);
+    std::streamsize fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    if (fileSize > static_cast<std::streamsize>(INT_MAX)) {
+        sendResponse(clientSocket, "Error: File size is too large to send.");
+        file.close();
+        return;
+    }
+    int fileSizeInt = static_cast<int>(fileSize);
+    send(clientSocket, reinterpret_cast<const char*>(&fileSizeInt), sizeof(fileSizeInt), 0);
+
+    // Send file content
+    char buffer[1024];
+    while (file.read(buffer, sizeof(buffer))) {
+        send(clientSocket, buffer, static_cast<int>(file.gcount()), 0);
+    }
+    if (file.gcount() > 0) {
+        send(clientSocket, buffer, static_cast<int>(file.gcount()), 0);
+    }
+
+    file.close();
+    std::cout << "File transfer complete.\n";
 }

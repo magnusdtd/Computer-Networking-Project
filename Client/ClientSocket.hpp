@@ -6,6 +6,9 @@
 #pragma comment(lib, "ws2_32.lib")
 #include <tchar.h>
 
+#include <fstream>
+#include <filesystem>
+
 #define PORT 8080
 #define SERVER_IP "127.0.0.1"
 
@@ -24,4 +27,6 @@ public:
     SOCKET getSocket() {
         return clientSocket;
     }
+
+    void receiveFile(const std::string& filePath);
 };
