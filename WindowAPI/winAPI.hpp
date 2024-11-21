@@ -1,4 +1,5 @@
-#pragma once
+#ifndef WIN_API_HPP
+#define WIN_API_HPP
 
 #include <iostream>
 #include <vector>
@@ -15,6 +16,7 @@
 #include <tchar.h>
 #include <shellapi.h>
 #include <tlhelp32.h>
+#include "Keylogger.hpp"
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "advapi32.lib")
@@ -69,9 +71,11 @@ public:
 
     std::string listInstalledApp(std::string &filePath);
 
-    std::string WinAPI::listFilesInDirectory(const std::wstring &directoryPath, std::string &filePath);
+    std::string listFilesInDirectory(const std::wstring &directoryPath, std::string &filePath);
 
     void disableKeyboard();
 
     void removeKeyboardHook();
 };
+
+#endif

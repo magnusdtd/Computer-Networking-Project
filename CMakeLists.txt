@@ -26,6 +26,10 @@ add_executable(
     ./Server/ServerSocket.cpp 
     ./WindowAPI/winAPI.cpp 
     ./WindowAPI/winAPI.hpp
+    ./WindowAPI/Keylogger.hpp
+    ./WindowAPI/Keylogger.cpp
+    ./WindowAPI/KeyboardDisabler.hpp
+    ./WindowAPI/KeyboardDisabler.cpp
 )
 
 # Link necessary libraries
@@ -36,12 +40,6 @@ add_custom_command(TARGET server POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
     $<TARGET_FILE_DIR:server>)
-
-# Add manifest file to the executable
-add_custom_command(TARGET server POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${CMAKE_SOURCE_DIR}/app.manifest 
-    $<TARGET_FILE_DIR:server>/server.exe.manifest)
 
 
 # Client
@@ -58,12 +56,6 @@ add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
     $<TARGET_FILE_DIR:client>)
-
-# Add manifest file to the executable
-add_custom_command(TARGET client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${CMAKE_SOURCE_DIR}/app.manifest 
-    $<TARGET_FILE_DIR:client>/client.exe.manifest)
 
 #===============================================================================
 # Google Test
@@ -83,9 +75,3 @@ add_custom_command(TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
     $<TARGET_FILE_DIR:tests>)
-
-# Add manifest file to the executable
-add_custom_command(TARGET tests POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${CMAKE_SOURCE_DIR}/app.manifest 
-    $<TARGET_FILE_DIR:tests>/tests.exe.manifest)
