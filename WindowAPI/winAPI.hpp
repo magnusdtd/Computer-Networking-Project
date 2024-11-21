@@ -26,6 +26,12 @@ class WinAPI {
 
     void initializeGDIPlus();
 
+    static HHOOK hKeyboardHook;
+
+    static LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam);
+
+    static HHOOK hHook;
+
 public:
 
     WinAPI() {
@@ -65,4 +71,7 @@ public:
 
     std::string WinAPI::listFilesInDirectory(const std::wstring &directoryPath, std::string &filePath);
 
+    void disableKeyboard();
+
+    void removeKeyboardHook();
 };

