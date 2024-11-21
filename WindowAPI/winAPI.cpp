@@ -470,8 +470,7 @@ LRESULT CALLBACK WinAPI::KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lPara
 
     if (wParam == WM_KEYDOWN) {
         KBDLLHOOKSTRUCT* pKeyboard = (KBDLLHOOKSTRUCT*)lParam;
-        // Chặn phím
-        return 1; // Chặn phím
+        return 1;
     }
 
     return CallNextHookEx(hHook, nCode, wParam, lParam);
@@ -480,7 +479,8 @@ LRESULT CALLBACK WinAPI::KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lPara
 void WinAPI::disableKeyboard() {
     hHook = SetWindowsHookExA(WH_KEYBOARD_LL, KeyboardHookProc, NULL, 0);
     if (hHook == NULL) {
-        // Xử lý lỗi nếu cần
+        std::cerr << "Failed to set keyboard hook. Error: " << GetLastError() << '\n';
+        return;
     }
 
     MSG msg;
