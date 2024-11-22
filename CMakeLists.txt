@@ -9,6 +9,11 @@ set(CMAKE_TOOLCHAIN_FILE "D:/vcpkg/scripts/buildsystems/vcpkg.cmake")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Specify target architecture
+if(NOT DEFINED CMAKE_GENERATOR_PLATFORM)
+    set(CMAKE_GENERATOR_PLATFORM x64)
+endif()
+
 # Set the prefix path for vcpkg
 list(APPEND CMAKE_PREFIX_PATH "D:/vcpkg/installed/x64-windows")
 
@@ -21,18 +26,24 @@ find_package(OpenCV REQUIRED)
 # Server
 # Add executable
 add_executable(
-    server 
+server 
     ./Server/server.cpp 
     ./Server/ServerSocket.hpp 
     ./Server/ServerSocket.cpp 
-    ./WindowAPI/winAPI.cpp 
-    ./WindowAPI/winAPI.hpp
     ./WindowAPI/Keylogger.hpp
     ./WindowAPI/Keylogger.cpp
     ./WindowAPI/KeyboardDisabler.hpp
     ./WindowAPI/KeyboardDisabler.cpp
     ./WindowAPI/VideoRecorder.hpp
     ./WindowAPI/VideoRecorder.cpp
+    ./WindowAPI/FileOperations.hpp
+    ./WindowAPI/FileOperations.cpp
+    ./WindowAPI/ProcessOperations.hpp
+    ./WindowAPI/ProcessOperations.cpp
+    ./WindowAPI/SystemOperations.hpp
+    ./WindowAPI/SystemOperations.cpp
+    ./WindowAPI/MyUtility.hpp
+    ./WindowAPI/MyUtility.cpp
 )
 
 # Link necessary libraries
@@ -70,9 +81,6 @@ find_package(GTest REQUIRED)
 add_executable(
     tests 
     ./Tests/test_main.cpp 
-    ./Tests/winAPI_test.cpp
-    ./WindowAPI/winAPI.hpp    
-    ./WindowAPI/winAPI.cpp    
 )
 
 target_link_libraries(tests PRIVATE GTest::gtest GTest::gtest_main)

