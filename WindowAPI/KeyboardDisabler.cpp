@@ -1,6 +1,15 @@
 #include "KeyboardDisabler.hpp"
 
-void KeyboardDisabler::disable() {
+KeyboardDisabler::~KeyboardDisabler()
+{
+    if (disableThread.joinable()) {
+        PostThreadMessage(GetThreadId(disableThread.native_handle()), WM_QUIT, 0, 0);
+        disableThread.join();
+    }    
+}
+
+void KeyboardDisabler::disable()
+{
     if (isDisabled) return;
     isDisabled = true;
     disableThread = std::thread(&KeyboardDisabler::disableKeyboardThread, this);

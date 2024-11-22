@@ -9,6 +9,7 @@
 class KeyboardDisabler {
 public:
     KeyboardDisabler() : isDisabled(false) {}
+    ~KeyboardDisabler();
 
     void disable();
     void enable();

