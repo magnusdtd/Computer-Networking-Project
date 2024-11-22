@@ -16,7 +16,6 @@
 #include <tchar.h>
 #include <shellapi.h>
 #include <tlhelp32.h>
-#include "Keylogger.hpp"
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "advapi32.lib")

