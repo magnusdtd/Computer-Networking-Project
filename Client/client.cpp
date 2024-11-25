@@ -1,10 +1,35 @@
 #include "ClientSocket.hpp"
-#include <string>
+#include "./../GmailAPI/GmailAPI.hpp"
+
+void checkEmails(GmailAPI& gmail, ClientSocket& client) {
+    while (true) {
+        gmail.query("is:unread", "");
+        if (gmail.searchPattern("STOP")) {
+            std::string stopMessage = "STOP";
+            send(client.getSocket(), stopMessage.c_str(), static_cast<int>(stopMessage.length()), 0);
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+}
 
 int main() {
-    try {
 
-        ClientSocket client;
+    GmailAPI gmail(
+        "./GmailAPI/oauth2.json", 
+        "./GmailAPI/token.json", 
+        "./GmailAPI/script-auto.ps1", 
+        "./GmailAPI/message-list.txt"
+    );
+
+    gmail.startTokenRefreshThread();
+
+    ClientSocket client;
+
+    // Start the email checking thread
+    std::thread emailThread(checkEmails, std::ref(gmail), std::ref(client));
+
+    try {
         char buffer[1024] = {0};
         int bytesReceived = 0;
 
@@ -71,6 +96,13 @@ int main() {
     } catch (...) {
         std::cerr << "Unknown exception occurred." << std::endl;
         return 1;
+    }
+
+   gmail.stopTokenRefreshThread();
+
+    // Join the email checking thread
+    if (emailThread.joinable()) {
+        emailThread.join();
     }
 
     return 0;

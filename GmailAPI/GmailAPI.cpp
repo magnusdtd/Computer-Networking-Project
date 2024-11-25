@@ -1,9 +1,9 @@
 #include "GmailAPI.hpp"
 
 void GmailAPI::readOAuthFile() {
-    std::fstream readBuffer(oauthFileName, std::ios::in);
+    std::fstream readBuffer(oauthFilePath, std::ios::in);
     if (!readBuffer.is_open()) {
-        throw std::runtime_error("Cannot open " + oauthFileName);
+        throw std::runtime_error("Cannot open " + oauthFilePath);
     }
 
     nlohmann::json jsonContent;
@@ -19,19 +19,26 @@ void GmailAPI::readOAuthFile() {
 }
 
 void GmailAPI::getAccessToken() {
-    std::fstream tokenFile(tokenFileName, std::ios::in);
+    std::fstream tokenFile(tokenFilePath, std::ios::in);
     // Check is file is empty or can't open, use ostream to automatically create new file if it does exsist.
 
     if (!tokenFile.is_open()) {
         tokenFile.close();
-        std::ofstream createFile(tokenFileName);
+        std::ofstream createFile(tokenFilePath);
         createFile.close();
-        tokenFile.open(tokenFileName, std::ios::in);
+        tokenFile.open(tokenFilePath, std::ios::in);
     }
 
-    if (tokenFile.peek() == std::ifstream::traits_type::eof()) {
+    tokenFile.seekg(0, std::ios::end);
+    if (tokenFile.tellg() == 0) {
         std::cerr << "Token file is empty or cannot be opened, running script to get new token." << '\n';
-        int result = system(("powershell -ExecutionPolicy Bypass -File .\\" + scriptFileName).c_str());
+        std::string command = "powershell -ExecutionPolicy Bypass -File " 
+                            + scriptFilePath + " "
+                            + oauthFilePath + " "
+                            + accountFilePath + " "
+                            + tokenFilePath;
+        std::cout << command << "\n";
+        int result = system(command.c_str());
         if (result != 0) {
             std::cerr << "Failed to run script\n";
             tokenFile.close();
@@ -39,8 +46,9 @@ void GmailAPI::getAccessToken() {
         }
         // Reopen the file after running the script
         tokenFile.close();
-        tokenFile.open(tokenFileName, std::ios::in);
-        if (!tokenFile.is_open() || tokenFile.peek() == std::ifstream::traits_type::eof()) {
+        tokenFile.open(tokenFilePath, std::ios::in);
+        tokenFile.seekg(0, std::ios::end);
+        if (!tokenFile.is_open() || tokenFile.tellg() == 0) {
             std::cerr << "Failed to obtain token after running script.ps1\n";
             tokenFile.close();
             exit(1);
@@ -50,7 +58,7 @@ void GmailAPI::getAccessToken() {
 }
 
 void GmailAPI::readAccessToken() {
-    std::fstream tokenFile(tokenFileName, std::ios::in);
+    std::fstream tokenFile(tokenFilePath, std::ios::in);
     if (tokenFile.is_open()) {
         nlohmann::json tokenJson;
         tokenFile >> tokenJson;
@@ -65,11 +73,17 @@ void GmailAPI::readAccessToken() {
             exit(1);
         }
     } else {
-        std::cerr << "Unable to open " + tokenFileName + " file\n";
+        std::cerr << "Unable to open " + tokenFilePath + " file\n";
         tokenFile.close();  
         exit(1);
     }
     tokenFile.close();
+}
+
+size_t GmailAPI::WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+    ((std::string*)userp)->append((char*)contents, size * nmemb);
+    return size * nmemb;
 }
 
 std::string GmailAPI::base64Encode(const std::string &input) {
@@ -208,9 +222,9 @@ void GmailAPI::refreshAccessToken() {
         std::string newAccessToken = jsonResponse["access_token"];
         if (!newAccessToken.empty()) {
             accessToken = newAccessToken;
-            std::ofstream tokenFile("new_access_token.txt", std::ios::out);
+            std::ofstream tokenFile("new_access_token.json", std::ios::out);
             if (tokenFile.is_open()) {
-                tokenFile << "New Access Token: " << newAccessToken << "\n";
+                tokenFile << newAccessToken << "\n";
                 tokenFile.close();
             } else
                 std::cerr << "Failed to open file to write new access token\n";
@@ -223,14 +237,14 @@ void GmailAPI::refreshAccessToken() {
 }
 
 GmailAPI::GmailAPI(
-    const std::string oauthFileName, 
-    const std::string tokenFileName, 
-    const std::string scriptFileName, 
-    const std::string messageListFileName) : 
-    oauthFileName(oauthFileName), 
-    tokenFileName(tokenFileName), 
-    scriptFileName(scriptFileName),
-    messageListFileName(messageListFileName)
+    const std::string oauthFilePath, 
+    const std::string tokenFilePath, 
+    const std::string scriptFilePath, 
+    const std::string messageListFilePath) : 
+    oauthFilePath(oauthFilePath), 
+    tokenFilePath(tokenFilePath), 
+    scriptFilePath(scriptFilePath),
+    messageListFilePath(messageListFilePath)
 {
     readOAuthFile();
     getAccessToken();
@@ -291,6 +305,22 @@ void GmailAPI::sendFile(const std::string &url, const std::string &emailData, st
 
         curl_easy_cleanup(curl);
     }
+}
+
+bool GmailAPI::searchPattern(const std::string &pattern)
+{
+    std::ifstream file(messageListFilePath);
+    if (!file.is_open()) {
+        std::cerr << "Unable to open file: " << messageListFilePath << '\n';
+        return false;
+    }
+
+    std::string line;
+    while (std::getline(file, line))
+        if (line.find(pattern) != std::string::npos)
+            return true;
+
+    return false;
 }
 
 void GmailAPI::send(const std::string &to, const std::string &subject, const std::string &body, const std::string &filePath) {
@@ -373,13 +403,14 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
     curl_global_cleanup();
 }
 
-void GmailAPI::query(const std::string& query, const std::string& userName, const std::string& outputFile) {
-    std::ofstream file(outputFile);
+void GmailAPI::query(const std::string& query, const std::string& userName) {
+    std::ofstream file(messageListFilePath);
     try {
-        std::string url = "https://www.googleapis.com/gmail/v1/users/me/messages?q=" + query + "&maxResults=25";
+        std::string url = "https://www.googleapis.com/gmail/v1/users/me/messages?q=" + query;
         if (!userName.empty()) {
             url += "+from:" + userName;
         }
+        url += "&maxResults=25";
 
         std::string readBuffer;
         CURL* curl = initializeCurl(url, tokenType, accessToken, readBuffer);
@@ -395,6 +426,11 @@ void GmailAPI::query(const std::string& query, const std::string& userName, cons
         } else {
             // Parse the JSON response
             auto jsonResponse = nlohmann::json::parse(readBuffer);
+
+            std::ofstream jsonFile("response.json");
+            jsonFile << readBuffer;
+            jsonFile.close();
+
             if (jsonResponse.contains("messages")) {
                 for (const auto& message : jsonResponse["messages"]) {
                     std::string messageId = message["id"];
@@ -474,7 +510,7 @@ void GmailAPI::fetchMessageDetails(CURL *curl, const std::string &messageUrl, st
 
 void GmailAPI::markAsRead() {
 
-    std::vector<std::string> messageIds = extractMessageIds(messageListFileName);
+    std::vector<std::string> messageIds = extractMessageIds(messageListFilePath);
     if (messageIds.empty()) {
         std::cout << "No unread messages\n";
         return;
@@ -531,4 +567,19 @@ std::vector<std::string> GmailAPI::extractMessageIds(const std::string& filename
     }
 
     return messageIds;
+}
+
+void GmailAPI::startTokenRefreshThread()
+{
+    stopThread = false;
+    tokenRefreshThread = std::thread(&GmailAPI::tokenRefreshLoop, this);
+}
+
+void GmailAPI::stopTokenRefreshThread()
+{
+    std:: cout << "Trying to stop thread\n";
+    stopThread = true;
+    if (tokenRefreshThread.joinable())
+        tokenRefreshThread.join();
+    std::cout << "Has stopped thread\n";    
 }

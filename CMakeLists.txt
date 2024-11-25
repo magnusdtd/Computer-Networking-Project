@@ -26,7 +26,7 @@ find_package(OpenCV REQUIRED)
 # Server
 # Add executable
 add_executable(
-server 
+    server 
     ./Server/server.cpp 
     ./Server/ServerSocket.hpp 
     ./Server/ServerSocket.cpp 
@@ -52,27 +52,30 @@ target_link_libraries(server PRIVATE ws2_32 ${OpenCV_LIBS})
 # Include OpenCV directories
 target_include_directories(server PRIVATE ${OpenCV_INCLUDE_DIRS})
 
-# Copy vcpkg debug binaries
-add_custom_command(TARGET server POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "D:/vcpkg/installed/x64-windows/debug/bin"
-    $<TARGET_FILE_DIR:server>)
-
-
 # Client
 add_executable(
     client 
     ./Client/client.cpp 
     ./Client/ClientSocket.hpp 
     ./Client/ClientSocket.cpp
+    ./GmailAPI/GmailAPI.hpp
+    ./GmailAPI/GmailAPI.cpp
 )
 
 target_link_libraries(client PRIVATE ws2_32 nlohmann_json::nlohmann_json CURL::libcurl OpenSSL::SSL)
 
-add_custom_command(TARGET client POST_BUILD
+# Custom command to copy directory after build
+add_custom_command(TARGET server POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "D:/Code/Socket/Final/build/Debug"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "D:/vcpkg/installed/x64-windows/debug/bin"
-    $<TARGET_FILE_DIR:client>)
+    "D:/Code/Socket/Final/build/Debug")
+
+add_custom_command(TARGET client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "D:/Code/Socket/Final/build/Debug"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "D:/vcpkg/installed/x64-windows/debug/bin"
+    "D:/Code/Socket/Final/build/Debug")
 
 #===============================================================================
 # Google Test
@@ -86,6 +89,7 @@ add_executable(
 target_link_libraries(tests PRIVATE GTest::gtest GTest::gtest_main)
 
 add_custom_command(TARGET tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "D:/Code/Socket/Final/build/Debug"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "D:/vcpkg/installed/x64-windows/debug/bin"
-    $<TARGET_FILE_DIR:tests>)
+    "D:/Code/Socket/Final/build/Debug")

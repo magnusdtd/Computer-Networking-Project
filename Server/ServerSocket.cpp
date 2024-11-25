@@ -27,6 +27,15 @@ ServerSocket::ServerSocket() :
         exit(1);
     }
 
+    // Set SO_REUSEADDR option
+    int optval = 1;
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof(optval)) == SOCKET_ERROR) {
+        std::cerr << "setsockopt failed: " << WSAGetLastError() << '\n';
+        closesocket(serverSocket);
+        WSACleanup();
+        exit(1);
+    }
+
     serverAddress.sin_family = AF_INET;
     InetPton(AF_INET, _T(SERVER_IP), &serverAddress.sin_addr.s_addr);
     serverAddress.sin_port = htons(PORT);

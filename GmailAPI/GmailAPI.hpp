@@ -3,7 +3,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <cstdlib>
 #include <sstream>
 #include <vector>
 #include <thread>
@@ -15,20 +14,25 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/buffer.h>
-#include <zlib.h>
 
 class GmailAPI {
 private:
     std::string clientId;
     std::string clientSecret;
 
+    const std::string accountFilePath = "./GmailAPI/account.json";
 
     std::string tokenType;
         
-    std::string oauthFileName;
-    std::string tokenFileName;
-    std::string scriptFileName;
-    std::string messageListFileName;
+    std::string oauthFilePath;
+    std::string tokenFilePath;
+    std::string scriptFilePath;
+    std::string messageListFilePath;
+
+    std::string accessToken;
+    std::string refreshToken;
+
+    time_t tokenExpirationTime;
 
 
     std::atomic<bool> stopThread;
@@ -40,10 +44,7 @@ private:
 
     void readAccessToken();
 
-    static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-        ((std::string*)userp)->append((char*)contents, size * nmemb);
-        return size * nmemb;
-    }
+    static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp);
 
     std::string base64Encode(const std::string &input);
 
@@ -71,34 +72,22 @@ private:
 
 public:
 
-    // For testing
-    std::string accessToken;
-    std::string refreshToken;
-
-    time_t tokenExpirationTime;
-
-    GmailAPI(const std::string oauthFileName, const std::string tokenFileName, const std::string scriptFileName, const std::string messageListFileName);
+    GmailAPI(const std::string oauthFilePath, const std::string tokenFilePath, const std::string scriptFilePath, const std::string messageListFilePath);
 
     void send(const std::string& to, const std::string& subject, const std::string& body);
     
     void send(const std::string& to, const std::string& subject, const std::string& body, const std::string &filePath);
 
-    void query(const std::string& query, const std::string& userName, const std::string& outputFile);
+    void query(const std::string& query, const std::string& userName);
 
     void markAsRead();
 
     std::vector<std::string> extractMessageIds(const std::string& filename);
 
-    void startTokenRefreshThread() {
-        stopThread = false;
-        tokenRefreshThread = std::thread(&GmailAPI::tokenRefreshLoop, this);
-    }
+    void startTokenRefreshThread();
     
-    void stopTokenRefreshThread() {
-        std:: cout << "Trying to stop thread\n";
-        stopThread = true;
-        if (tokenRefreshThread.joinable())
-            tokenRefreshThread.join();
-        std::cout << "Has stopped thread\n";    
-    }
+    void stopTokenRefreshThread();
+
+    bool searchPattern(const std::string& pattern);
+
 };

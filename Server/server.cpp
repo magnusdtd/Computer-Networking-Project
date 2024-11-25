@@ -1,6 +1,4 @@
 #include "ServerSocket.hpp"
-#include <thread>
-#include <vector>
 
 // Function to handle client connection
 void handleClientConnection(ServerSocket &server, SOCKET &clientSocket) {
