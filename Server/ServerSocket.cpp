@@ -150,6 +150,7 @@ void ServerSocket::initializeHandlers() {
     handlers[STOP] = [this](SOCKET &clientSocket, const std::string& command) {
         this->~ServerSocket();
         closesocket(clientSocket);
+        std::cout << "Server has been stopped.\n";
         exit(0);
     };
 

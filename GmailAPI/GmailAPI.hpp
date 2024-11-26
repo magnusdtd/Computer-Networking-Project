@@ -14,6 +14,14 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/buffer.h>
+#include <stdexcept>
+#include <codecvt>
+#include <locale>
+
+const std::string base64_chars = 
+             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+             "abcdefghijklmnopqrstuvwxyz"
+             "0123456789+/";
 
 class GmailAPI {
 private:
@@ -52,7 +60,11 @@ private:
 
     std::string base64Encode(const std::vector<unsigned char> &input);
 
-    std::string base64Decode(const std::string &input);
+    //std::string base64Decode(const std::string &input);
+
+    bool is_base64(unsigned char c) {
+        return (isalnum(c) || (c == '+') || (c == '/'));
+    }
 
     std::string readFile(const std::string &filePath);
 
@@ -89,5 +101,8 @@ public:
     void stopTokenRefreshThread();
 
     bool searchPattern(const std::string& pattern);
+
+    //Testing
+    std::string base64Decode(const std::string &input);
 
 };

@@ -83,10 +83,12 @@ find_package(GTest REQUIRED)
 
 add_executable(
     tests 
-    ./Tests/test_main.cpp 
+    ./Tests/test_GmailAPI.cpp
+    ./GmailAPI/GmailAPI.hpp
+    ./GmailAPI/GmailAPI.cpp
 )
 
-target_link_libraries(tests PRIVATE GTest::gtest GTest::gtest_main)
+target_link_libraries(tests PRIVATE GTest::gtest GTest::gtest_main nlohmann_json::nlohmann_json CURL::libcurl OpenSSL::SSL)
 
 add_custom_command(TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "D:/Code/Socket/Final/build/Debug"

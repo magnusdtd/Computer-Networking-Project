@@ -1,12 +1,14 @@
 #include "ServerSocket.hpp"
 
-// Function to handle client connection
-void handleClientConnection(ServerSocket &server, SOCKET &clientSocket) {
+int main() {
+    ServerSocket server;
+    SOCKET clientSocket;
+
     clientSocket = accept(server.getSocket(), nullptr, nullptr);
     // Accept connection from client
     if (clientSocket == INVALID_SOCKET) {
         std::cerr << "Accept failed.\n";
-        return;
+        return 1;
     }
 
     char buffer[1024] = {0};
@@ -25,14 +27,6 @@ void handleClientConnection(ServerSocket &server, SOCKET &clientSocket) {
         }
     }
     closesocket(clientSocket);
-}
-
-int main() {
-    ServerSocket server;
-    SOCKET clientSocket;
-
-    std::thread serverThread(handleClientConnection, std::ref(server), std::ref(clientSocket));
-    serverThread.join();
 
     return 0;
 }

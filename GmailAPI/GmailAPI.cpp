@@ -37,7 +37,6 @@ void GmailAPI::getAccessToken() {
                             + oauthFilePath + " "
                             + accountFilePath + " "
                             + tokenFilePath;
-        std::cout << command << "\n";
         int result = system(command.c_str());
         if (result != 0) {
             std::cerr << "Failed to run script\n";
@@ -134,24 +133,29 @@ std::string GmailAPI::base64Encode(const std::vector<unsigned char>& input) {
     return encoded;
 }
 
-std::string GmailAPI::base64Decode(const std::string &input)
+std::string GmailAPI::base64Decode(const std::string &encoded_string) 
 {
-    std::string out;
+    // Calculate the maximum possible size of the decoded output
+    int decodeLen = static_cast<int>(encoded_string.size() * 3 / 4);
+    std::vector<unsigned char> buffer(decodeLen);
 
-    int decodeLen = static_cast<int>(input.size());
-    std::vector<char> buffer(decodeLen);
+    // Decode the base64 input
+    int decoded_size = EVP_DecodeBlock(buffer.data(), reinterpret_cast<const unsigned char*>(encoded_string.data()), encoded_string.size());
+    if (decoded_size < 0) {
+        std::cerr << "Failed to decode base64 input\n";
+        return "";
+    }
 
-    BIO *b64 = BIO_new(BIO_f_base64());
-    BIO *bio = BIO_new_mem_buf(input.data(), decodeLen);
-    bio = BIO_push(b64, bio);
+    // Remove padding characters from the decoded output
+    while (decoded_size > 0 && buffer[decoded_size - 1] == '\0') {
+        --decoded_size;
+    }
 
-    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
-    int decoded_size = BIO_read(bio, buffer.data(), decodeLen);
-    out.assign(buffer.data(), decoded_size);
+    std::string decodedData(buffer.begin(), buffer.begin() + decoded_size);
 
-    BIO_free_all(bio);
+    std::cout << "out: " << decodedData << "\n";
 
-    return out;
+    return decodedData;
 }
 
 std::string GmailAPI::readFile(const std::string &filePath) {
@@ -185,7 +189,7 @@ void GmailAPI::tokenRefreshLoop() {
 }
 
 void GmailAPI::refreshAccessToken() {
-    std::cout << "Trying to get refresh token\n";
+    std::cout << "Trying to refresh access token\n";
 
     CURL* curl;
     CURLcode res;
@@ -222,12 +226,18 @@ void GmailAPI::refreshAccessToken() {
         std::string newAccessToken = jsonResponse["access_token"];
         if (!newAccessToken.empty()) {
             accessToken = newAccessToken;
-            std::ofstream tokenFile("new_access_token.json", std::ios::out);
+            std::ofstream tokenFile(tokenFilePath, std::ios::out);
             if (tokenFile.is_open()) {
-                tokenFile << newAccessToken << "\n";
+                nlohmann::json tokenJson;
+                tokenJson["access_token"] = accessToken;
+                tokenJson["refresh_token"] = refreshToken;
+                tokenJson["token_type"] = tokenType;
+                tokenJson["expires_in"] = jsonResponse["expires_in"];
+                tokenFile << tokenJson.dump(4) << "\n";
                 tokenFile.close();
-            } else
+            } else {
                 std::cerr << "Failed to open file to write new access token\n";
+            }
         } else {
             std::cerr << "Failed to refresh access token\n";
         }
@@ -235,7 +245,6 @@ void GmailAPI::refreshAccessToken() {
         std::cerr << "Failed to refresh access token: " << jsonResponse.dump() << '\n';
     }
 }
-
 GmailAPI::GmailAPI(
     const std::string oauthFilePath, 
     const std::string tokenFilePath, 
@@ -404,16 +413,32 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
 }
 
 void GmailAPI::query(const std::string& query, const std::string& userName) {
-    std::ofstream file(messageListFilePath);
+    std::ofstream file(messageListFilePath, std::ios::out | std::ios::binary);
     try {
-        std::string url = "https://www.googleapis.com/gmail/v1/users/me/messages?q=" + query;
+        // Check if the token is expired and refresh if necessary
+        if (isTokenExpired()) {
+            refreshAccessToken();
+        }
+
+        CURL* curl = curl_easy_init();
+        if (!curl) {
+            file << "Failed to initialize CURL\n";
+            return;
+        }
+
+        char* encodedQuery = curl_easy_escape(curl, query.c_str(), static_cast<int>(query.length()));
+        std::string url = "https://www.googleapis.com/gmail/v1/users/me/messages?q=" + std::string(encodedQuery);
+        curl_free(encodedQuery);
+
         if (!userName.empty()) {
-            url += "+from:" + userName;
+            char* encodedUserName = curl_easy_escape(curl, userName.c_str(), static_cast<int>(userName.length()));
+            url += "+from:" + std::string(encodedUserName);
+            curl_free(encodedUserName);
         }
         url += "&maxResults=25";
 
         std::string readBuffer;
-        CURL* curl = initializeCurl(url, tokenType, accessToken, readBuffer);
+        curl = initializeCurl(url, tokenType, accessToken, readBuffer);
         if (!curl) {
             file << "Failed to initialize CURL\n";
             return;
@@ -427,9 +452,9 @@ void GmailAPI::query(const std::string& query, const std::string& userName) {
             // Parse the JSON response
             auto jsonResponse = nlohmann::json::parse(readBuffer);
 
-            std::ofstream jsonFile("response.json");
-            jsonFile << readBuffer;
-            jsonFile.close();
+            // std::ofstream jsonFile("response.json", std::ios::out);
+            // jsonFile << readBuffer << "\n";
+            // jsonFile.close();
 
             if (jsonResponse.contains("messages")) {
                 for (const auto& message : jsonResponse["messages"]) {
@@ -473,6 +498,11 @@ void GmailAPI::fetchMessageDetails(CURL *curl, const std::string &messageUrl, st
     curl_easy_setopt(curl, CURLOPT_URL, messageUrl.c_str());
     readBuffer.clear();
     CURLcode res = curl_easy_perform(curl);
+
+    std::ofstream jsonFile("response.json", std::ios::out);
+    jsonFile << readBuffer << "\n";
+    jsonFile.close();
+
     if (res == CURLE_OK) {
         auto messageResponse = nlohmann::json::parse(readBuffer);
         if (messageResponse.contains("payload")) {
@@ -491,14 +521,19 @@ void GmailAPI::fetchMessageDetails(CURL *curl, const std::string &messageUrl, st
             }
 
             // Extract body
-            if (payload.contains("parts")) {
+            if (payload.contains("mimeType") && payload["mimeType"] == "multipart/alternative" && payload.contains("parts")) {
                 for (const auto& part : payload["parts"]) {
                     if (part.contains("mimeType") && part["mimeType"] == "text/plain" && part.contains("body") && part["body"].contains("data")) {
-                        body = base64Decode(part["body"]["data"]);
-                        break;
+                        std::string temp = part["body"]["data"];
+                        std::cout << "Body before decode " << temp << "\n";
+                        body = base64Decode(temp);
+                        std::cout << "Body after decode " << body << "\n-------\n";
                     }
                 }
+            } else if (payload.contains("body") && payload["body"].contains("data")) {
+                body = base64Decode(payload["body"]["data"]);
             }
+        
 
             file << "Subject: " << subject << "\n";
             file << "Body: " << body << "\n\n";
