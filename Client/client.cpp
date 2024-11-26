@@ -9,10 +9,9 @@ int main() {
         "./GmailAPI/oauth2.json", 
         "./GmailAPI/token.json", 
         "./GmailAPI/script-auto.ps1", 
-        "./GmailAPI/message-list.txt"
+        "./GmailAPI/message-list.txt",
+        "./GmailAPI/refreshToken.json"
     );
-
-    gmail.startTokenRefreshThread();
 
     ClientSocket client;
 
@@ -89,6 +88,8 @@ int main() {
                             std::string fileName = filePath.substr(filePath.find_last_of("/\\") + 1);
                             std::string outputFilePath = "./output-client/" + fileName;
                             client.receiveFile(outputFilePath);
+
+                            //gmail.send("", "", "", outputFilePath);
                         } else {
                             std::cerr << "\t-> [Client] Failed to receive file name from the server.\n";
                         }
@@ -98,8 +99,12 @@ int main() {
                         if (bytesReceived > 0) {
                             buffer[bytesReceived] = '\0';
                             std::cout << "\t-> [Response from server] " << buffer << '\n';
+
+                            std::string content(buffer);
+                            // gmail.send("", message + " worked as expected", content);
                         } else {
                             std::cerr << "\t-> [Client] Failed to receive file name from the server.\n";
+                            gmail.send("", message + " didn't work as expected", "There was some mysterious error or something not work as expected in the system, try to reconnet to server and build/run server again.");
                         }
                     }
                 }
@@ -114,8 +119,6 @@ int main() {
         std::cerr << "Unknown exception occurred." << std::endl;
         return 1;
     }
-
-    gmail.stopTokenRefreshThread();
 
     std::cout << "Client has been stopped.\n";
 

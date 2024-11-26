@@ -60,6 +60,10 @@ add_executable(
     ./Client/ClientSocket.cpp
     ./GmailAPI/GmailAPI.hpp
     ./GmailAPI/GmailAPI.cpp
+    ./GmailAPI/Base64.hpp
+    ./GmailAPI/Base64.cpp
+    ./GmailAPI/OAuthManager.hpp
+    ./GmailAPI/OAuthManager.cpp
 )
 
 target_link_libraries(client PRIVATE ws2_32 nlohmann_json::nlohmann_json CURL::libcurl OpenSSL::SSL)

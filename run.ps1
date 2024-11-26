@@ -1,19 +1,19 @@
 Write-Output "Running project ..."
 Write-Output ""
 
-# Delete the build folder if it exists
-if (Test-Path -Path "./build") {
-    Write-Output "Deleting existing build folder ..."
-    Remove-Item -Recurse -Force "./build"
-}
+# # Delete the build folder if it exists
+# if (Test-Path -Path "./build") {
+#     Write-Output "Deleting existing build folder ..."
+#     Remove-Item -Recurse -Force "./build"
+# }
 
-# Create a new build folder
-Write-Output "Creating new build folder ..."
-cmake -S . -B build
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "CMake configuration failed."
-    exit $LASTEXITCODE
-}
+# # Create a new build folder
+# Write-Output "Creating new build folder ..."
+# cmake -S . -B build
+# if ($LASTEXITCODE -ne 0) {
+#     Write-Error "CMake configuration failed."
+#     exit $LASTEXITCODE
+# }
 
 # Run cmake build command
 Write-Output "Building project ..."
