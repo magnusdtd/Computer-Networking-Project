@@ -41,8 +41,6 @@ private:
 
     void fetchMessageDetails(CURL* curl, const std::string& messageUrl, std::string& readBuffer, std::ofstream& file);
 
-    void sendFile(const std::string& url, const std::string& emailData, struct curl_slist* headers);
-
     std::vector<std::string> extractMessageIds(const std::string& filename);
 
     void processQueue();

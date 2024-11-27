@@ -83,7 +83,7 @@ void GmailAPI::processQueue()
                     // Send the result back to the user via email
                     if (success)
                         if (filePath.empty())
-                            send("", command + " worked as expected", response);
+                            send(user->email, command + " worked as expected", response);
                         else
                             send(user->email, command + " worked as expected", response, filePath);
                     else
@@ -123,12 +123,15 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
 
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, emailData.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
 
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
         std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << '\n';
     } else {
         std::cout << "Email sent successfully!\n";
+        std::cout << "Response: " << readBuffer << '\n';
     }
 
     curl_easy_cleanup(curl);
@@ -136,27 +139,8 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
     curl_global_cleanup();
 }
 
-void GmailAPI::sendFile(const std::string &url, const std::string &emailData, struct curl_slist *headers) {
-    CURL *curl = curl_easy_init();
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, emailData.c_str());
-        curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L); // Increase buffer size
-        curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0); // Enable HTTP/2
-
-        CURLcode res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << '\n';
-        } else {
-            std::cout << "Email sent successfully!\n";
-        }
-
-        curl_easy_cleanup(curl);
-    }
-}
-
-void GmailAPI::send(const std::string &to, const std::string &subject, const std::string &body, const std::string &filePath) {
+void GmailAPI::send(const std::string &to, const std::string &subject, const std::string &body, const std::string &filePath)
+{
     std::string url = "https://www.googleapis.com/gmail/v1/users/me/messages/send";
     std::string readBuffer;
 
@@ -199,10 +183,6 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
         return;
     }
 
-    std::fstream out("encodedData.txt", std::ios::out);
-    out << encodedFile;
-    out.close();
-
     // Construct the email with attachment
     std::string boundary = "boundary";
     std::string rawEmail = 
@@ -222,13 +202,28 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
     nlohmann::json emailJson;
     emailJson["raw"] = base64->encode(rawEmail);
 
-    std::cout << "Finished encoded mail\n";
-
     std::string emailData = emailJson.dump();
 
     // Use a separate thread to send the file
-    std::thread uploadThread([this, url, emailData, headers]() {
-        this->sendFile(url, emailData, headers);
+    std::thread uploadThread([this, url, emailData, headers, &readBuffer]() {
+        CURL *curl = curl_easy_init();
+        if (curl) {
+            curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, emailData.c_str());
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+            CURLcode res = curl_easy_perform(curl);
+            if (res != CURLE_OK) {
+                std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << '\n';
+            } else {
+                std::cout << "Email sent successfully!\n";
+                std::cout << "Response: " << readBuffer << '\n';
+            }
+
+            curl_easy_cleanup(curl);
+        }
     });
     uploadThread.join();
 

@@ -1,6 +1,5 @@
 #include "ClientSocket.hpp"
 
-
 std::unordered_map<std::string, std::string> messageMap = {
     {"shutdown", "SHUTDOWN"},
     {"restart", "RESTART"},
