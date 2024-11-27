@@ -254,7 +254,7 @@ void ServerSocket::initializeHandlers() {
 
     handlers[START_APP] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
-        if (tokens.size() < 2) {
+        if (tokens.size() != 2) {
             sendResponse(clientSocket, "Usage: startApp <application_path>");
             return;
         }
@@ -304,7 +304,7 @@ void ServerSocket::initializeHandlers() {
 
     handlers[LIST_FILES] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
-        if (tokens.size() < 2) {
+        if (tokens.size() != 2) {
             sendResponse(clientSocket, "Usage: listFiles <directory_path>");
             return;
         }
