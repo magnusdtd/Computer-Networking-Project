@@ -3,7 +3,8 @@
 
 #include <iostream>
 #include <string>
-#include <atomic>
+#include <mutex>
+#include <condition_variable>
 #include <thread>
 #include <nlohmann/json.hpp>
 #include <curl/curl.h>
@@ -29,7 +30,9 @@ protected:
     std::string refreshToken;
     std::string tokenType;
     std::chrono::system_clock::time_point tokenExpirationTime;
-    std::atomic<bool> stopThread;
+    std::mutex stopMutex;
+    std::condition_variable stopCondVar;
+    bool isStopThread;
     std::thread tokenRefreshThread;
 
     void readOAuthFile();

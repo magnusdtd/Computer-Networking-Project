@@ -19,15 +19,84 @@ std::vector<unsigned char> GmailAPI::readBinaryFile(const std::string &filePath)
     return buffer;
 }
 
-GmailAPI::GmailAPI(const std::string &oauthFilePath, const std::string &tokenFilePath, const std::string &scriptFilePath, const std::string &messageListFilePath) : 
-    OAuthManager(oauthFilePath, tokenFilePath, scriptFilePath), 
-    base64(new Base64()), 
-    messageListFilePath(messageListFilePath) {}
+GmailAPI::GmailAPI(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath, ClientSocket& clientSocket)
+    : OAuthManager(oauthFilePath, tokenFilePath, scriptFilePath), 
+      base64(new Base64()), 
+      messageListFilePath(messageListFilePath),
+      clientSocket(clientSocket),
+      isStopMQThread(false)
+{
+    messageQueueThread = std::thread(&GmailAPI::processQueue, this);
+}
 
 GmailAPI::~GmailAPI()
 {
+    {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        isStopMQThread = true;
+    }
+    while (!userQueue.empty()) { 
+        User *temp = userQueue.front();
+        userQueue.pop(); 
+        delete temp;
+        temp = nullptr;
+    }
+    queueCondVar.notify_all();
+    messageQueueThread.join();
     delete base64;
     base64 = nullptr;
+}
+
+void GmailAPI::processQueue()
+{
+    while (true) {
+        std::unique_lock<std::mutex> lock(queueMutex);
+        queueCondVar.wait(lock, [this] { return !userQueue.empty() || isStopMQThread; });
+
+        if (isStopMQThread && userQueue.empty())
+            break;
+
+        std::vector<User*> batch;
+        while (!userQueue.empty()) {
+            batch.push_back(userQueue.front());
+            userQueue.pop();
+        }
+        lock.unlock();
+
+        std::string command, response, filePath, pattern;
+
+        for (User* user : batch) {
+            std::cout << "Processing user: " << user->name << "\n";
+
+            // Extract command from the user's email subject
+            std::string subject = user->subject;
+            bool isValidCommand = false;
+            for (const auto& message : messageMap) {
+                command = message.first;
+                pattern = "👻 " + command;
+                if (subject.find(pattern) != std::string::npos) {
+                    isValidCommand = true;
+                    std::cout << "Command: " << command << "\n";
+                    // Send the command to the client socket and get the response
+                    bool success = clientSocket.executeCommand(command, response, filePath);
+
+                    // Send the result back to the user via email
+                    if (success)
+                        if (filePath.empty())
+                            send("", command + " worked as expected", response);
+                        else
+                            send(user->email, command + " worked as expected", response, filePath);
+                    else
+                        send(user->email, command + " didn't work as expected", "There was some mysterious error or something not work as expected in the system, try to reconnect to server and build/run server again.");    
+                }
+            }
+
+            if (!isValidCommand)
+                std::cout << "No command found\n";
+            delete user;
+            user = nullptr;
+        }
+    }
 }
 
 void GmailAPI::send(const std::string &to, const std::string &subject, const std::string &body)
@@ -85,22 +154,6 @@ void GmailAPI::sendFile(const std::string &url, const std::string &emailData, st
 
         curl_easy_cleanup(curl);
     }
-}
-
-bool GmailAPI::searchPattern(const std::string &pattern)
-{
-    std::ifstream file(messageListFilePath);
-    if (!file.is_open()) {
-        std::cerr << "Unable to open file: " << messageListFilePath << '\n';
-        return false;
-    }
-
-    std::string line;
-    while (std::getline(file, line))
-        if (line.find(pattern) != std::string::npos)
-            return true;
-
-    return false;
 }
 
 void GmailAPI::send(const std::string &to, const std::string &subject, const std::string &body, const std::string &filePath) {
@@ -269,9 +322,9 @@ void GmailAPI::fetchMessageDetails(CURL *curl, const std::string &messageUrl, st
     readBuffer.clear();
     CURLcode res = curl_easy_perform(curl);
 
-    std::ofstream jsonFile("./GmailAPI/response.json", std::ios::out);
-    jsonFile << readBuffer << "\n";
-    jsonFile.close();
+    // std::ofstream jsonFile("./GmailAPI/response.json", std::ios::out);
+    // jsonFile << readBuffer << "\n";
+    // jsonFile.close();
 
     if (res == CURLE_OK) {
         auto messageResponse = nlohmann::json::parse(readBuffer);
@@ -279,13 +332,21 @@ void GmailAPI::fetchMessageDetails(CURL *curl, const std::string &messageUrl, st
             const auto& payload = messageResponse["payload"];
             std::string subject;
             std::string body;
+            std::string sender;
+            std::string senderEmail;
 
-            // Extract subject
+            // Extract subject, sender, and sender email
             if (payload.contains("headers")) {
                 for (const auto& header : payload["headers"]) {
                     if (header["name"] == "Subject") {
                         subject = header["value"];
-                        break;
+                    } else if (header["name"] == "From") {
+                        sender = header["value"];
+                        size_t start = sender.find('<');
+                        size_t end = sender.find('>');
+                        if (start != std::string::npos && end != std::string::npos) {
+                            senderEmail = sender.substr(start + 1, end - start - 1);
+                        }
                     }
                 }
             }
@@ -301,10 +362,19 @@ void GmailAPI::fetchMessageDetails(CURL *curl, const std::string &messageUrl, st
             } else if (payload.contains("body") && payload["body"].contains("data")) {
                 body = base64->decode(payload["body"]["data"]);
             }
-        
 
+            file << "From: " << sender << "\n";
+            file << "Sender email: " << senderEmail << "\n";
             file << "Subject: " << subject << "\n";
             file << "Body: " << body << "\n\n";
+
+            // Create a User object and add it to the queue
+            User* user = new User(sender, senderEmail, subject, body);
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                userQueue.push(user);
+            }
+            queueCondVar.notify_one();
         }
     } else {
         file << "Failed to fetch message details for URL: " << messageUrl << "\n";

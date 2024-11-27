@@ -1,7 +1,7 @@
 #include "OAuthManager.hpp"
 
 OAuthManager::OAuthManager(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath)
-    : oauthFilePath(oauthFilePath), tokenFilePath(tokenFilePath), scriptFilePath(scriptFilePath), stopThread(false) {
+    : oauthFilePath(oauthFilePath), tokenFilePath(tokenFilePath), scriptFilePath(scriptFilePath), isStopThread(false) {
     readOAuthFile();
     getAccessToken();
     readAccessToken();
@@ -117,79 +117,108 @@ void OAuthManager::getRefreshToken() {
     CURL* curl;
     CURLcode res;
     std::string readBuffer;
+    int retryCount = 0;
+    const int maxRetries = 3;
 
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init();
+    while (retryCount < maxRetries) {
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+        curl = curl_easy_init();
 
-    if(curl) {
-        std::string postFields = "client_id=" + clientId + "&client_secret=" + clientSecret + "&refresh_token=" + refreshToken + "&grant_type=refresh_token";
+        if (curl) {
+            std::string postFields = "client_id=" + clientId + "&client_secret=" + clientSecret + "&refresh_token=" + refreshToken + "&grant_type=refresh_token";
 
-        curl_easy_setopt(curl, CURLOPT_URL, "https://oauth2.googleapis.com/token");
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+            curl_easy_setopt(curl, CURLOPT_URL, "https://oauth2.googleapis.com/token");
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields.c_str());
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
 
-        res = curl_easy_perform(curl);
+            res = curl_easy_perform(curl);
 
-        if(res != CURLE_OK) {
-            std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << '\n';
-            std::cerr << "Failed to get refresh token\n";
-            exit(1);
+            if (res != CURLE_OK) {
+                std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << '\n';
+                std::cerr << "Failed to get refresh token\n";
+                retryCount++;
+            } else {
+                auto jsonResponse = nlohmann::json::parse(readBuffer);
+
+                if (jsonResponse.contains("access_token") && jsonResponse.contains("expires_in")) {
+                    std::fstream tokenFile(tokenFilePath, std::ios::in | std::ios::out);
+                    if (tokenFile.is_open()) {
+                        nlohmann::json tokenJson;
+                        tokenFile >> tokenJson;
+
+                        tokenJson["access_token"] = jsonResponse["access_token"];
+                        tokenJson["expires_in"] = jsonResponse["expires_in"];
+
+                        auto now = std::chrono::system_clock::now();
+                        tokenJson["obtained_at"] = std::to_string(std::chrono::system_clock::to_time_t(now));
+
+                        tokenFile.close();
+                        tokenFile.open(tokenFilePath, std::ios::trunc | std::ios::out);
+                        tokenFile << tokenJson << '\n';
+                        tokenFile.close();
+
+                        //std::cout << "Successfully refreshed access token\n";
+                        curl_easy_cleanup(curl);
+                        curl_global_cleanup();
+                        return;
+                    } else {
+                        std::cerr << "Failed to open token file to write new access token\n";
+                        retryCount++;
+                    }
+                } else {
+                    std::cerr << "Failed to refresh access token: " << jsonResponse.dump() << '\n';
+                    retryCount++;
+                }
+            }
+
+            curl_easy_cleanup(curl);
         }
 
-        curl_easy_cleanup(curl);
+        curl_global_cleanup();
+
+        if (retryCount < maxRetries) {
+            std::cerr << "Retrying to get refresh token (" << retryCount << "/" << maxRetries << ")\n";
+            std::this_thread::sleep_for(std::chrono::seconds(2)); // Wait before retrying
+        }
     }
 
-    curl_global_cleanup();
-
-    auto jsonResponse = nlohmann::json::parse(readBuffer);
-
-    if (jsonResponse.contains("access_token") && jsonResponse.contains("expires_in")) {
-
-        std::fstream tokenFile(tokenFilePath, std::ios::in | std::ios::out);
-        if (tokenFile.is_open()) {
-            nlohmann::json tokenJson;
-            tokenFile >> tokenJson;
-
-            tokenJson["access_token"] = jsonResponse["access_token"];
-            tokenJson["expires_in"] = jsonResponse["expires_in"];
-
-            auto now = std::chrono::system_clock::now();
-            jsonResponse["obtained_at"] = std::to_string(std::chrono::system_clock::to_time_t(now));
-
-            tokenFile.close();
-            tokenFile.open(tokenFilePath, std::ios::trunc | std::ios::out);
-            tokenFile << tokenJson << '\n';
-            tokenFile.close();
-        } else {
-            std::cerr << "Failed to open token file to write new access token\n";
-        } 
-    } else {
-        std::cerr << "Failed to refresh access token: " << jsonResponse.dump() << '\n';
-    }
+    std::cerr << "Exceeded maximum retries to get refresh token\n";
+    exit(1);
 }
 
 void OAuthManager::startTokenRefreshThread() {
-    stopThread = false;
+    {
+        std::lock_guard<std::mutex> lock(stopMutex);
+        isStopThread = false;
+    }
     tokenRefreshThread = std::thread(&OAuthManager::refreshTokenLoop, this);
 }
 
 void OAuthManager::stopTokenRefreshThread() {
-    stopThread = true;
+    {
+        std::lock_guard<std::mutex> lock(stopMutex);
+        isStopThread = true;
+    }
+    stopCondVar.notify_all();
     if (tokenRefreshThread.joinable())
         tokenRefreshThread.join();
 }
 
 void OAuthManager::refreshTokenLoop() {
-    while (!stopThread) {
+    while (true) {
+        {
+            std::unique_lock<std::mutex> lock(stopMutex);
+            if (stopCondVar.wait_for(lock, std::chrono::seconds(5), [this] { return isStopThread; })) {
+                break;
+            }
+        }
+
         if (isTokenExpired()) {
             getRefreshToken();
             readAccessToken();
+            std::cout << "New access token via refresh token!\n";
         }
-
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-
-        if (stopThread) break;
     }
 }
 
