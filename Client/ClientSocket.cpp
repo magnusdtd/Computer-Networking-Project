@@ -26,7 +26,8 @@ std::unordered_map<std::string, std::string> messageMap = {
     {"screenRecording", "SCREEN_RECORDING"}
 };
 
-ClientSocket::ClientSocket(): bytesReceived(0), stopClient(false) {
+ClientSocket::ClientSocket(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath)
+    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath, messageListFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false) {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         std::cerr << "WSAStartup failed.\n";
@@ -52,6 +53,25 @@ ClientSocket::ClientSocket(): bytesReceived(0), stopClient(false) {
         WSACleanup();
         exit(1);
     }
+
+    messageQueueThread = std::thread(&ClientSocket::processQueue, this);
+}
+
+ClientSocket::~ClientSocket() {
+    {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        isStopMQThread = true;
+    }
+    while (!userQueue.empty()) { 
+        User *temp = userQueue.front();
+        userQueue.pop(); 
+        delete temp;
+        temp = nullptr;
+    }
+    queueCondVar.notify_all();
+    messageQueueThread.join();
+    closesocket(clientSocket);
+    WSACleanup();
 }
 
 void ClientSocket::receiveFile(const std::string &filePath)
@@ -92,7 +112,7 @@ void ClientSocket::receiveFile(const std::string &filePath)
 
 bool ClientSocket::executeCommand(const std::string &command, std::string &response, std::string& filePath)
 {
-    send(clientSocket, command.c_str(), static_cast<int>(command.length()), 0);
+    ::send(clientSocket, command.c_str(), static_cast<int>(command.length()), 0);
 
     if (command == "STOP") {
         memset(buffer, 0, sizeof(buffer));
@@ -145,5 +165,121 @@ bool ClientSocket::executeCommand(const std::string &command, std::string &respo
             std::cerr << "\t-> [Client] Failed to receive file name from the server.\n";
             return false;
         }
+    }
+}
+
+void ClientSocket::processQueue() {
+    while (true) {
+        std::unique_lock<std::mutex> lock(queueMutex);
+        queueCondVar.wait(lock, [this] { return !userQueue.empty() || isStopMQThread; });
+
+        if (isStopMQThread && userQueue.empty())
+            break;
+
+        std::vector<User*> batch;
+        while (!userQueue.empty()) {
+            batch.push_back(userQueue.front());
+            userQueue.pop();
+        }
+        lock.unlock();
+
+        std::string command, response, filePath, pattern;
+
+        for (User* user : batch) {
+            std::cout << "Processing user: " << user->name << "\n";
+
+            // Extract command from the user's email subject
+            std::string subject = user->subject;
+            bool isValidCommand = false;
+            for (const auto& message : messageMap) {
+                command = message.first;
+                pattern = "👻 " + command;
+                if (subject.find(pattern) != std::string::npos) {
+                    isValidCommand = true;
+                    std::cout << "Command: " << command << "\n";
+                    // Send the command to the client socket and get the response
+                    bool success = executeCommand(command, response, filePath);
+
+                    // Send the result back to the user via email
+                    if (success)
+                        if (filePath.empty())
+                            send(user->email, command + " worked as expected", response);
+                        else
+                            send(user->email, command + " worked as expected", response, filePath);
+                    else
+                        send(user->email, command + " didn't work as expected", "There was some mysterious error or something not work as expected in the system, try to reconnect to server and build/run server again.");    
+                }
+            }
+
+            if (!isValidCommand)
+                std::cout << "No command found\n";
+            delete user;
+            user = nullptr;
+        }
+    }
+}
+
+void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl, std::string &readBuffer, std::ofstream &file)
+{
+    curl_easy_setopt(curl, CURLOPT_URL, messageUrl.c_str());
+    readBuffer.clear();
+    CURLcode res = curl_easy_perform(curl);
+
+    // std::ofstream jsonFile("./GmailAPI/response.json", std::ios::out);
+    // jsonFile << readBuffer << "\n";
+    // jsonFile.close();
+
+    if (res == CURLE_OK) {
+        auto messageResponse = nlohmann::json::parse(readBuffer);
+        if (messageResponse.contains("payload")) {
+            const auto& payload = messageResponse["payload"];
+            std::string subject;
+            std::string body;
+            std::string sender;
+            std::string senderEmail;
+
+            // Extract subject, sender, and sender email
+            if (payload.contains("headers")) {
+                for (const auto& header : payload["headers"]) {
+                    if (header["name"] == "Subject") {
+                        subject = header["value"];
+                    } else if (header["name"] == "From") {
+                        sender = header["value"];
+                        size_t start = sender.find('<');
+                        size_t end = sender.find('>');
+                        if (start != std::string::npos && end != std::string::npos) {
+                            senderEmail = sender.substr(start + 1, end - start - 1);
+                        }
+                    }
+                }
+            }
+
+            // Extract body
+            if (payload.contains("mimeType") && payload["mimeType"] == "multipart/alternative" && payload.contains("parts")) {
+                for (const auto& part : payload["parts"]) {
+                    if (part.contains("mimeType") && part["mimeType"] == "text/plain" && part.contains("body") && part["body"].contains("data")) {
+                        std::string temp = part["body"]["data"];
+                        body = base64->decode(temp);
+                    }
+                }
+            } else if (payload.contains("body") && payload["body"].contains("data")) {
+                body = base64->decode(payload["body"]["data"]);
+            }
+
+            file << "From: " << sender << "\n";
+            file << "Sender email: " << senderEmail << "\n";
+            file << "Subject: " << subject << "\n";
+            file << "Body: " << body << "\n\n";
+
+            // Create a User object and add it to the queue
+            User* user = new User(sender, senderEmail, subject, body);
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                userQueue.push(user);
+            }
+            queueCondVar.notify_one();
+        }
+    } else {
+        file << "Failed to fetch message details for URL: " << messageUrl << "\n";
     }
 }

@@ -14,6 +14,7 @@ public:
     : name(name), email(email), subject(subject), body(body) {}
     
     friend class GmailAPI;
+    friend class ClientSocket;
 };
 
 #endif

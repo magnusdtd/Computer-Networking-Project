@@ -1,23 +1,20 @@
-#include "./../GmailAPI/GmailAPI.hpp"
+#include "./ClientSocket.hpp"
 
 int main() {
     SetConsoleOutputCP(CP_UTF8);
 
-    ClientSocket client;
-
-    GmailAPI gmail(
+    ClientSocket client(
         "./GmailAPI/oauth2.json", 
         "./GmailAPI/token.json", 
         "./GmailAPI/script-auto.ps1", 
-        "./GmailAPI/message-list.txt",
-        client
+        "./GmailAPI/message-list.txt"
     );
 
     try {
         while (!client.getStopClient()) {
             std::cout << "\t -> [Client] Client is querying for command ...\n";
-            gmail.query("is:unread", "");
-            gmail.markAsRead();
+            client.query("is:unread", "");
+            client.markAsRead();
             Sleep(3000); // Sleep for 3 seconds before checking again
         }
     } catch (const std::exception& e) {

@@ -4,13 +4,12 @@
 #include "OAuthManager.hpp"
 #include "Base64.hpp"
 #include "User.hpp"
-#include "./../Client/ClientSocket.hpp"
 #include <queue>
 #include <sstream>
 
 class GmailAPI : OAuthManager {
 public:
-    GmailAPI(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath, ClientSocket& clientSocket);
+    GmailAPI(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath);
 
     ~GmailAPI();
 
@@ -22,16 +21,12 @@ public:
 
     void markAsRead();
 
+protected:
+
+    Base64 *base64;
+
 private:
     std::string messageListFilePath;
-    Base64 *base64;
-    ClientSocket& clientSocket;
-
-    std::queue<User*> userQueue;
-    std::mutex queueMutex;
-    std::condition_variable queueCondVar;
-    std::thread messageQueueThread;
-    bool isStopMQThread;
 
     std::string readFile(const std::string& filePath);
 
@@ -39,11 +34,9 @@ private:
 
     CURL* initializeCurl(const std::string& url, const std::string& tokenType, const std::string& accessToken, std::string& readBuffer);
 
-    void fetchMessageDetails(CURL* curl, const std::string& messageUrl, std::string& readBuffer, std::ofstream& file);
+    virtual void fetchMessageDetails(CURL* curl, const std::string& messageUrl, std::string& readBuffer, std::ofstream& file);
 
     std::vector<std::string> extractMessageIds(const std::string& filename);
-
-    void processQueue();
 };
 
 #endif
