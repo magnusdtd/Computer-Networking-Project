@@ -1,4 +1,4 @@
-Write-Output "Building project ..."
+Write-Output "Building test cases ..."
 Write-Output ""
 cmake --build build --target tests
 if ($LASTEXITCODE -ne 0) {

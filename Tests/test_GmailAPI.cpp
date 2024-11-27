@@ -1,15 +1,48 @@
 #include <gtest/gtest.h>
 #include "./../GmailAPI/GmailAPI.hpp"
+#include "./../Client/ClientSocket.hpp"
 
-TEST(GmailAPITest, Base64Decode) {
-    GmailAPI gmailAPI("./GmailAPI/oauth2.json", "./GmailAPI/token.json", "./GmailAPI/script-auto.ps1", "./GmailAPI/message-list.txt");
+class GmailAPITest : public ::testing::Test {
+protected:
+    GmailAPI* gmailAPI;
+    ClientSocket* clientSocket;
 
-    std::string input = "YWZoYWtsZmhhZiBhbGZqYWRmbGogcnlyYXNnDQphZWVmZQ0KZGZnc2Rnag0Kd3JncndnIPCfkbsgU1RPUCBvaw0KZnNrZWhqZg0KDQpieWUsIPCfpKfij6zirIfvuI_wn6m18J-YjQ0K";
-    std::string expectedOutput = "afhaklfhaf alfjadflj ryrasg\naeefe\ndfgsdgj\nwrgrwg 👻 STOP ok\nfskehjf\n\nbye, 🤧⏬⬇️🩵😍\n";
+    void SetUp() override {
+        clientSocket = new ClientSocket();
+        gmailAPI = new GmailAPI("./GmailAPI/oauth2.json", "./GmailAPI/token.json", "./GmailAPI/script-auto.ps1", "./GmailAPI/message-list.txt", *clientSocket);
+    }
 
-    std::string output = gmailAPI.base64Decode(input);
+    void TearDown() override {
+        delete gmailAPI;
+        delete clientSocket;
+    }
+};
 
-    ASSERT_EQ(output, expectedOutput);
+TEST_F(GmailAPITest, SendEmailWithSubjectAndBody) {
+    std::string to = "datdt0212@gmail.com";
+    std::string subject = "Test Subject";
+    std::string body = "This is a test email body.";
+
+    // Call the send function
+    ASSERT_NO_THROW(gmailAPI->send(to, subject, body));
+}
+
+TEST_F(GmailAPITest, SendEmailWithSubjectBodyAndFile) {
+    std::string to = "datdt0212@gmail.com";
+    std::string subject = "Test Subject";
+    std::string body = "This is a test email body.";
+    std::string filePath = "./testfile.txt";
+
+    // Create a test file
+    std::ofstream testFile(filePath);
+    testFile << "This is a test file.";
+    testFile.close();
+
+    // Call the send function
+    ASSERT_NO_THROW(gmailAPI->send(to, subject, body, filePath));
+
+    // Clean up the test file
+    std::remove(filePath.c_str());
 }
 
 int main(int argc, char **argv) {   

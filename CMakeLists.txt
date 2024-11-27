@@ -88,8 +88,10 @@ find_package(GTest REQUIRED)
 add_executable(
     tests 
     ./Tests/test_GmailAPI.cpp
-    ./GmailAPI/GmailAPI.hpp
     ./GmailAPI/GmailAPI.cpp
+    ./GmailAPI/OAuthManager.cpp
+    ./GmailAPI/Base64.cpp
+    ./Client/ClientSocket.cpp
 )
 
 target_link_libraries(tests PRIVATE GTest::gtest GTest::gtest_main nlohmann_json::nlohmann_json CURL::libcurl OpenSSL::SSL)
