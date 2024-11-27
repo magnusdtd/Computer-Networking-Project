@@ -12,7 +12,7 @@
 
 class OAuthManager {
 public:
-    OAuthManager(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string &refreshTokenFilePath);
+    OAuthManager(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath);
     ~OAuthManager();
 
     void startTokenRefreshThread();
@@ -39,8 +39,6 @@ protected:
     void readAccessToken();
 
     void getRefreshToken();
-
-    void readRefreshToken();
 
     void refreshTokenLoop();
 

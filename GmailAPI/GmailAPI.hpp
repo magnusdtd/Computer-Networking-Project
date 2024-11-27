@@ -7,7 +7,7 @@
 
 class GmailAPI : OAuthManager {
 public:
-    GmailAPI(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath, const std::string& refreshTokenFilePath);
+    GmailAPI(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath);
 
     ~GmailAPI();
 

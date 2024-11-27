@@ -19,8 +19,8 @@ std::vector<unsigned char> GmailAPI::readBinaryFile(const std::string &filePath)
     return buffer;
 }
 
-GmailAPI::GmailAPI(const std::string &oauthFilePath, const std::string &tokenFilePath, const std::string &scriptFilePath, const std::string &messageListFilePath, const std::string &refreshTokenFilePath) : 
-    OAuthManager(oauthFilePath, tokenFilePath, scriptFilePath, refreshTokenFilePath), 
+GmailAPI::GmailAPI(const std::string &oauthFilePath, const std::string &tokenFilePath, const std::string &scriptFilePath, const std::string &messageListFilePath) : 
+    OAuthManager(oauthFilePath, tokenFilePath, scriptFilePath), 
     base64(new Base64()), 
     messageListFilePath(messageListFilePath) {}
 

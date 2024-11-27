@@ -1,7 +1,7 @@
 #include "OAuthManager.hpp"
 
-OAuthManager::OAuthManager(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string &refreshTokenFilePath)
-    : oauthFilePath(oauthFilePath), tokenFilePath(tokenFilePath), refreshTokenFilePath(refreshTokenFilePath), scriptFilePath(scriptFilePath), stopThread(false) {
+OAuthManager::OAuthManager(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath)
+    : oauthFilePath(oauthFilePath), tokenFilePath(tokenFilePath), scriptFilePath(scriptFilePath), stopThread(false) {
     readOAuthFile();
     getAccessToken();
     readAccessToken();
@@ -145,49 +145,28 @@ void OAuthManager::getRefreshToken() {
     auto jsonResponse = nlohmann::json::parse(readBuffer);
 
     if (jsonResponse.contains("access_token") && jsonResponse.contains("expires_in")) {
-        auto now = std::chrono::system_clock::now();
-        jsonResponse["obtained_at"] = std::to_string(std::chrono::system_clock::to_time_t(now));
 
-        std::ofstream tokenFile(refreshTokenFilePath, std::ios::out);
+        std::fstream tokenFile(tokenFilePath, std::ios::in | std::ios::out);
         if (tokenFile.is_open()) {
-            tokenFile << jsonResponse << '\n';            
+            nlohmann::json tokenJson;
+            tokenFile >> tokenJson;
+
+            tokenJson["access_token"] = jsonResponse["access_token"];
+            tokenJson["expires_in"] = jsonResponse["expires_in"];
+
+            auto now = std::chrono::system_clock::now();
+            jsonResponse["obtained_at"] = std::to_string(std::chrono::system_clock::to_time_t(now));
+
+            tokenFile.close();
+            tokenFile.open(tokenFilePath, std::ios::trunc | std::ios::out);
+            tokenFile << tokenJson << '\n';
             tokenFile.close();
         } else {
-            std::cerr << "Failed to open file to write new access token\n";
+            std::cerr << "Failed to open token file to write new access token\n";
         } 
     } else {
         std::cerr << "Failed to refresh access token: " << jsonResponse.dump() << '\n';
     }
-}
-
-void OAuthManager::readRefreshToken()
-{
-    std::fstream tokenFile(refreshTokenFilePath, std::ios::in);
-
-    if (tokenFile.is_open()) {
-        nlohmann::json tokenJson;
-        tokenFile >> tokenJson;
-
-        if (tokenJson.contains("access_token") && tokenJson.contains("token_type") && tokenJson.contains("obtained_at")) {
-
-            accessToken = tokenJson["access_token"];
-            tokenType = tokenJson["token_type"];
-
-            std::string obtainedAtStr = tokenJson["obtained_at"];
-            auto obtainedAt = std::chrono::system_clock::from_time_t(static_cast<time_t>(std::stoll(obtainedAtStr)));
-            auto expiresIn = std::chrono::seconds(tokenJson["expires_in"].get<int>());
-            tokenExpirationTime = obtainedAt + expiresIn;
-        } else {
-            std::cerr << "Invalid token file format.\n";
-            tokenFile.close();
-            exit(1);
-        }
-    } else {
-        std::cerr << "Unable to open " + refreshTokenFilePath + " file\n";
-        tokenFile.close();  
-        exit(1);
-    }
-    tokenFile.close();
 }
 
 void OAuthManager::startTokenRefreshThread() {
@@ -205,7 +184,7 @@ void OAuthManager::refreshTokenLoop() {
     while (!stopThread) {
         if (isTokenExpired()) {
             getRefreshToken();
-            readRefreshToken();
+            readAccessToken();
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(5));

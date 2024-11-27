@@ -9,8 +9,7 @@ int main() {
         "./GmailAPI/oauth2.json", 
         "./GmailAPI/token.json", 
         "./GmailAPI/script-auto.ps1", 
-        "./GmailAPI/message-list.txt",
-        "./GmailAPI/refreshToken.json"
+        "./GmailAPI/message-list.txt"
     );
 
     ClientSocket client;
