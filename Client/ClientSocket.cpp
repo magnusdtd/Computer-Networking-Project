@@ -26,8 +26,28 @@ std::unordered_map<std::string, std::string> messageMap = {
     {"screenRecording", "SCREEN_RECORDING"}
 };
 
-ClientSocket::ClientSocket(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath)
-    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath, messageListFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false) {
+std::vector<std::string> ClientSocket::splitArguments(const std::string &str)
+{
+    std::vector<std::string> result;
+    std::regex re(R"((\"[^\"]*\")|(\S+))");
+    std::sregex_iterator it(str.begin(), str.end(), re);
+    std::sregex_iterator end;
+    while (it != end) {
+        if ((*it)[1].matched) {
+            std::string quotedStr = (*it)[1].str();
+            // Remove the enclosing quotes
+            result.push_back(quotedStr.substr(1, quotedStr.length() - 2));
+        } else if ((*it)[2].matched) {
+            result.push_back((*it)[2].str());
+        }
+        ++it;
+    }
+    return result;
+}
+
+ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &tokenFilePath, const std::string &scriptFilePath, const std::string &messageListFilePath)
+    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath, messageListFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false)
+{
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         std::cerr << "WSAStartup failed.\n";
@@ -110,23 +130,37 @@ void ClientSocket::receiveFile(const std::string &filePath)
     std::cout << "File received successfully.\n"; 
 }
 
-bool ClientSocket::executeCommand(const std::string &command, std::string &response, std::string& filePath)
+bool ClientSocket::executeCommand(std::string &response, std::string& receivedFilePath, const std::string &command, const std::string& arg1, const std::string& arg2)
 {
-    ::send(clientSocket, command.c_str(), static_cast<int>(command.length()), 0);
+    std::string fullCommand;
+    if (!arg1.empty() && !arg2.empty())
+        fullCommand = command + " " + arg1 + " " + arg2;
+    else if (!arg1.empty() && arg2.empty())
+        fullCommand = command + " " + arg1;
+    else if (arg1.empty() && arg2.empty())
+        fullCommand = command;
+    else {
+        response = "Invalid command!";
+        return false;
+    }
+
+    ::send(clientSocket, fullCommand.c_str(), static_cast<int>(fullCommand.length()), 0);
 
     if (command == "STOP") {
         memset(buffer, 0, sizeof(buffer));
         bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
         stopClient = true;
+        response = "Server has been stop!";
         return true;
     }
-    else if (command == "listProcess" ||
-        command == "listService" ||
-        command == "listRunningApp" ||
-        command == "listInstalledApp" ||
-        command == "listFiles" ||
-        command == "captureScreen" ||
-        command == "disableKeylogger" ) {
+    else if (   command == "listProcess" ||
+                command == "listService" ||
+                command == "listRunningApp" ||
+                command == "listInstalledApp" ||
+                command == "listFiles" ||
+                command == "captureScreen" ||
+                command == "disableKeylogger" ) {
+        // These command has file send back to client
         // Receive the file name from the server
         memset(buffer, 0, sizeof(buffer));
         bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
@@ -135,20 +169,21 @@ bool ClientSocket::executeCommand(const std::string &command, std::string &respo
             std::cout << "\t-> [Response from server] " << buffer << '\n';
 
             // Extract the file path from the server's response command
-            std::string temp(buffer); response = temp;
-            std::string filePath;
+            std::string temp(buffer); 
+            response = temp;
             std::string keyword = " at ";
             size_t pos = temp.find(keyword);
-            filePath = temp.substr(pos + keyword.length());
+            std::string filePath = temp.substr(pos + keyword.length());
 
             // Extract the file name from the file path
             std::string fileName = filePath.substr(filePath.find_last_of("/\\") + 1);
-            std::string outputFilePath = "./output-client/" + fileName;
+            std::string outputFilePath = "./output-client/" + fileName; 
+            receivedFilePath = outputFilePath;
             receiveFile(outputFilePath);
 
             return true;
         } else {
-            std::cerr << "\t-> [Client] Failed to receive file name from the server.\n";
+            std::cerr << "\t-> [Client] Failed to receive message from the server.\n";
             return false;
         }
     } else {
@@ -162,7 +197,7 @@ bool ClientSocket::executeCommand(const std::string &command, std::string &respo
 
             return true;
         } else {
-            std::cerr << "\t-> [Client] Failed to receive file name from the server.\n";
+            std::cerr << "\t-> [Client] Failed to receive message from the server.\n";
             return false;
         }
     }
@@ -183,8 +218,6 @@ void ClientSocket::processQueue() {
         }
         lock.unlock();
 
-        std::string command, response, filePath, pattern;
-
         for (User* user : batch) {
             std::cout << "Processing user: " << user->name << "\n";
 
@@ -192,13 +225,44 @@ void ClientSocket::processQueue() {
             std::string subject = user->subject;
             bool isValidCommand = false;
             for (const auto& message : messageMap) {
+                std::string command, response, filePath, pattern;
                 command = message.first;
                 pattern = "👻 " + command;
-                if (subject.find(pattern) != std::string::npos) {
+                size_t position = subject.find(pattern);
+                if (position != std::string::npos) {
+                    bool success = false;
                     isValidCommand = true;
+
+                    std::string argsStr = subject.substr(position + pattern.length());
+                    std::vector<std::string> args = splitArguments(argsStr);
+
+                    std::cout << "________________\nArg: ";
+                    for (auto& arg : args)
+                        std::cout << arg << "\n";
+                    std::cout << "_________\n";
+
+                    if (command == "copy" || command == "copyFolder") { 
+                        // these commands need 2 additional arguments
+                        if (args.size() < 2) {
+                            std::cerr << "Invalid number of arguments for command: " << command << "\n";
+                            continue;
+                        }
+                        success = executeCommand(response, filePath, command, "\"" + args[0] + "\"", "\"" + args[1] + "\"");
+                        command += " \"" + args[0] + "\" \"" + args[1] + "\"";
+                    } else if (command == "delete" || command == "createFolder" || command == "startApp" || command == "terminateProcess" || command == "listFiles" || command == "screenRecording") { 
+                        // these commands need 1 additional arguments
+                        if (args.size() < 1) {
+                            std::cerr << "Invalid number of arguments for command: " << command << "\n";
+                            continue;
+                        }
+                        success = executeCommand(response, filePath, command, "\"" + args[0] + "\"");
+                        command += " \"" + args[0] + "\"";
+                    } else {
+                        success = executeCommand(response, filePath, command);
+                    }
+
                     std::cout << "Command: " << command << "\n";
                     // Send the command to the client socket and get the response
-                    bool success = executeCommand(command, response, filePath);
 
                     // Send the result back to the user via email
                     if (success)
@@ -266,10 +330,10 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
                 body = base64->decode(payload["body"]["data"]);
             }
 
-            file << "From: " << sender << "\n";
-            file << "Sender email: " << senderEmail << "\n";
-            file << "Subject: " << subject << "\n";
-            file << "Body: " << body << "\n\n";
+            // file << "From: " << sender << "\n";
+            // file << "Sender email: " << senderEmail << "\n";
+            // file << "Subject: " << subject << "\n";
+            // file << "Body: " << body << "\n\n";
 
             // Create a User object and add it to the queue
             User* user = new User(sender, senderEmail, subject, body);

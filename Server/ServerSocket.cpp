@@ -107,8 +107,21 @@ MessageType ServerSocket::hashMessage(const std::string message) {
 }
 
 std::vector<std::string> ServerSocket::parseCommand(const std::string& command) {
-    std::istringstream iss(command);
-    return std::vector<std::string>{std::istream_iterator<std::string>{iss}, std::istream_iterator<std::string>{}};
+    std::vector<std::string> result;
+    std::regex re(R"((\"[^\"]*\")|(\S+))");
+    std::sregex_iterator it(command.begin(), command.end(), re);
+    std::sregex_iterator end;
+    while (it != end) {
+        if ((*it)[1].matched) {
+            std::string quotedStr = (*it)[1].str();
+            // Remove the enclosing quotes
+            result.push_back(quotedStr.substr(1, quotedStr.length() - 2));
+        } else if ((*it)[2].matched) {
+            result.push_back((*it)[2].str());
+        }
+        ++it;
+    }
+    return result;
 }
 
 void ServerSocket::sendResponse(SOCKET &clientSocket, const std::string& response) {
@@ -129,12 +142,12 @@ void ServerSocket::sendMessage(SOCKET &clientSocket, const char *message)
 
 void ServerSocket::initializeHandlers() {
     handlers[SHUTDOWN] = [this](SOCKET &clientSocket, const std::string& command) { 
-        sendResponse(clientSocket, "Trying to shutdown server!\n");
+        sendResponse(clientSocket, "Server has been shutdown!\n");
         systemOperations->systemShutdown(); 
     };
 
     handlers[RESTART] = [this](SOCKET &clientSocket, const std::string& command) { 
-        sendResponse(clientSocket, "Trying to restart server!\n");
+        sendResponse(clientSocket, "Server has been restart!\n");
         LPWSTR restartMessage = L"RESTART"; 
         systemOperations->systemRestart(restartMessage); 
     };
@@ -259,7 +272,7 @@ void ServerSocket::initializeHandlers() {
             return;
         }
 
-        std::wstring applicationPath = std::wstring(command.begin() + command.find(' ') + 1, command.end());
+        std::wstring applicationPath = std::wstring(tokens[1].begin(), tokens[1].end());
         std::string result = processOperations->StartApplication(applicationPath);
         sendResponse(clientSocket, result);
     };
@@ -308,7 +321,7 @@ void ServerSocket::initializeHandlers() {
             sendResponse(clientSocket, "Usage: listFiles <directory_path>");
             return;
         }
-        const std::wstring directoryPath = std::wstring(command.begin() + command.find(' ') + 1, command.end());
+        const std::wstring directoryPath = std::wstring(tokens[1].begin(), tokens[1].end());
         std::string fileName = MyUtility::generateName("file_list", "txt");
         std::string filePath = "./output-server/" + fileName;
         std::string result = fileOperations->listFilesInDirectory(directoryPath, filePath);

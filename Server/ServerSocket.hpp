@@ -10,6 +10,7 @@
 #include <tchar.h>
 #include <thread>
 #include <atomic>
+#include <regex>
 #pragma comment(lib, "ws2_32.lib")
 
 #include "./../WindowAPI/KeyboardDisabler.hpp"

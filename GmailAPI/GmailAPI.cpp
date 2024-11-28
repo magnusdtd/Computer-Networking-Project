@@ -289,10 +289,10 @@ void GmailAPI::fetchMessageDetails(CURL *curl, const std::string &messageUrl, st
                 body = base64->decode(payload["body"]["data"]);
             }
 
-            file << "From: " << sender << "\n";
-            file << "Sender email: " << senderEmail << "\n";
-            file << "Subject: " << subject << "\n";
-            file << "Body: " << body << "\n\n";
+            // file << "From: " << sender << "\n";
+            // file << "Sender email: " << senderEmail << "\n";
+            // file << "Subject: " << subject << "\n";
+            // file << "Body: " << body << "\n\n";
             
         }
     } else {

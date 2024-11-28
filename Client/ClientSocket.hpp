@@ -14,6 +14,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <regex>
 
 #include "./../GmailAPI/GmailAPI.hpp"
 
@@ -36,6 +37,8 @@ private:
     std::thread messageQueueThread;
     bool isStopMQThread;
 
+    std::vector<std::string> splitArguments(const std::string& str);
+
 public:
     ClientSocket(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath);
 
@@ -49,7 +52,7 @@ public:
 
     void receiveFile(const std::string& filePath);
 
-    bool executeCommand(const std::string &command, std::string &response, std::string& filePath);
+    bool executeCommand(std::string &response, std::string& receivedFilePath, const std::string &command, const std::string& arg1 = "", const std::string& arg2 = "");
 
     void processQueue();
 
