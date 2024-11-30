@@ -202,7 +202,6 @@ bool ClientSocket::executeCommand(std::string &response, std::string& receivedFi
         }
     }
 }
-
 void ClientSocket::processQueue() {
     while (true) {
         std::unique_lock<std::mutex> lock(queueMutex);
@@ -221,64 +220,49 @@ void ClientSocket::processQueue() {
         for (User* user : batch) {
             std::cout << "Processing user: " << user->name << "\n";
 
-            // Extract command from the user's email subject
-            std::string subject = user->subject;
+            // Combine subject and body for command search
+            std::string combinedText = user->subject + " " + user->body;
             bool isValidCommand = false;
-            for (const auto& message : messageMap) {
-                std::string command, response, filePath, pattern;
-                command = message.first;
-                pattern = "👻 " + command;
-                size_t position = subject.find(pattern);
-                if (position != std::string::npos) {
-                    bool success = false;
-                    isValidCommand = true;
 
-                    std::string argsStr = subject.substr(position + pattern.length());
+            for (const auto& message : messageMap) {
+                const std::string& command = message.first;
+                const std::string pattern = "👻 " + command;
+                size_t position = combinedText.find(pattern);
+
+                if (position != std::string::npos) {
+                    isValidCommand = true;
+                    std::string argsStr = combinedText.substr(position + pattern.length());
                     std::vector<std::string> args = splitArguments(argsStr);
 
-                    std::cout << "________________\nArg: ";
-                    for (auto& arg : args)
-                        std::cout << arg << "\n";
-                    std::cout << "_________\n";
+                    std::string response, filePath;
+                    bool success = false;
 
-                    if (command == "copy" || command == "copyFolder") { 
-                        // these commands need 2 additional arguments
-                        if (args.size() < 2) {
-                            std::cerr << "Invalid number of arguments for command: " << command << "\n";
-                            continue;
-                        }
+                    if ((command == "copy" || command == "copyFolder") && args.size() >= 2) {
                         success = executeCommand(response, filePath, command, "\"" + args[0] + "\"", "\"" + args[1] + "\"");
-                        command += " \"" + args[0] + "\" \"" + args[1] + "\"";
-                    } else if (command == "delete" || command == "createFolder" || command == "startApp" || command == "terminateProcess" || command == "listFiles" || command == "screenRecording") { 
-                        // these commands need 1 additional arguments
-                        if (args.size() < 1) {
-                            std::cerr << "Invalid number of arguments for command: " << command << "\n";
-                            continue;
-                        }
+                    } else if ((command == "delete" || command == "createFolder" || command == "startApp" || command == "terminateProcess" || command == "listFiles" || command == "screenRecording") && args.size() >= 1) {
                         success = executeCommand(response, filePath, command, "\"" + args[0] + "\"");
-                        command += " \"" + args[0] + "\"";
                     } else {
                         success = executeCommand(response, filePath, command);
                     }
 
                     std::cout << "Command: " << command << "\n";
-                    // Send the command to the client socket and get the response
 
                     // Send the result back to the user via email
-                    if (success)
+                    if (success) {
                         if (filePath.empty())
                             send(user->email, command + " worked as expected", response);
                         else
                             send(user->email, command + " worked as expected", response, filePath);
-                    else
-                        send(user->email, command + " didn't work as expected", "There was some mysterious error or something not work as expected in the system, try to reconnect to server and build/run server again.");    
+                    } else {
+                        send(user->email, command + " didn't work as expected", "There was some mysterious error or something not work as expected in the system, try to reconnect to server and build/run server again.");
+                    }
                 }
             }
 
             if (!isValidCommand)
                 std::cout << "No command found\n";
+
             delete user;
-            user = nullptr;
         }
     }
 }
@@ -289,9 +273,9 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
     readBuffer.clear();
     CURLcode res = curl_easy_perform(curl);
 
-    // std::ofstream jsonFile("./GmailAPI/response.json", std::ios::out);
-    // jsonFile << readBuffer << "\n";
-    // jsonFile.close();
+    std::ofstream jsonFile("./GmailAPI/response.json", std::ios::out);
+    jsonFile << readBuffer << "\n";
+    jsonFile.close();
 
     if (res == CURLE_OK) {
         auto messageResponse = nlohmann::json::parse(readBuffer);
@@ -323,6 +307,7 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
                 for (const auto& part : payload["parts"]) {
                     if (part.contains("mimeType") && part["mimeType"] == "text/plain" && part.contains("body") && part["body"].contains("data")) {
                         std::string temp = part["body"]["data"];
+                        std::cout << "Body - data: " << temp << '\n';
                         body = base64->decode(temp);
                     }
                 }

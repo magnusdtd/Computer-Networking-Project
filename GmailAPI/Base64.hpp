@@ -15,10 +15,8 @@ public:
     static std::string encode(const std::string &input);
     static std::string encode(const std::vector<unsigned char> &input);
     static std::string decode(const std::string &input);
-
 private:
-    static std::string encodeChunk(const std::vector<unsigned char>& input);
-    static bool isBase64(unsigned char c);
+    static std::string normalizeBase64(const std::string &input);
 };
 
 #endif

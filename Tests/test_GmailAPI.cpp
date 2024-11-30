@@ -1,20 +1,16 @@
 #include <gtest/gtest.h>
 #include "./../GmailAPI/GmailAPI.hpp"
-#include "./../Client/ClientSocket.hpp"
 
 class GmailAPITest : public ::testing::Test {
 protected:
     GmailAPI* gmailAPI;
-    ClientSocket* clientSocket;
 
     void SetUp() override {
-        clientSocket = new ClientSocket();
-        gmailAPI = new GmailAPI("./GmailAPI/oauth2.json", "./GmailAPI/token.json", "./GmailAPI/script-auto.ps1", "./GmailAPI/message-list.txt", *clientSocket);
+        gmailAPI = new GmailAPI("./GmailAPI/oauth2.json", "./GmailAPI/token.json", "./GmailAPI/script-auto.ps1", "./GmailAPI/message-list.txt");
     }
 
     void TearDown() override {
         delete gmailAPI;
-        delete clientSocket;
     }
 };
 
@@ -45,8 +41,15 @@ TEST_F(GmailAPITest, SendEmailWithSubjectBodyAndFile) {
     std::remove(filePath.c_str());
 }
 
-int main(int argc, char **argv) {   
-    SetConsoleOutputCP(CP_UTF8);
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+TEST_F(GmailAPITest, QueryEmails) {
+    std::string query = "from:someone@example.com";
+    std::string userName = "someone";
+
+    // Call the query function
+    ASSERT_NO_THROW(gmailAPI->query(query, userName));
+}
+
+TEST_F(GmailAPITest, MarkEmailsAsRead) {
+    // Call the markAsRead function
+    ASSERT_NO_THROW(gmailAPI->markAsRead());
 }

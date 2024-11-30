@@ -18,35 +18,28 @@ std::string Base64::encode(const std::string &input) {
 }
 
 std::string Base64::encode(const std::vector<unsigned char>& input) {
-    size_t chunkSize = input.size() / std::thread::hardware_concurrency();
-    std::vector<std::future<std::string>> futures;
-    std::string encoded;
+    BIO* b64 = BIO_new(BIO_f_base64());
+    BIO* bio = BIO_new(BIO_s_mem());
+    bio = BIO_push(b64, bio);
 
-    for (size_t i = 0; i < input.size(); i += chunkSize) {
-        size_t end = i + chunkSize > input.size() ? input.size() : i + chunkSize;
-        std::vector<unsigned char> chunk(input.begin() + i, input.begin() + end);
-        futures.push_back(std::async(std::launch::async, [chunk]() { return encodeChunk(chunk); }));
-    }
+    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+    BIO_write(bio, reinterpret_cast<const char*>(input.data()), static_cast<int>(input.size()));
+    BIO_flush(bio);
 
-    for (auto& future : futures)
-        encoded += future.get();
+    BUF_MEM* bufferPtr;
+    BIO_get_mem_ptr(bio, &bufferPtr);
+    std::string encodedData(bufferPtr->data, bufferPtr->length);
+    BIO_free_all(bio);
 
-    return encoded;
-}
-
-std::string Base64::encodeChunk(const std::vector<unsigned char>& input) {
-    std::string encoded;
-    encoded.resize(4 * ((input.size() + 2) / 3));
-    int encodedLength = EVP_EncodeBlock((unsigned char*)encoded.data(), (const unsigned char*)input.data(), static_cast<int>(input.size()));
-    encoded.resize(encodedLength);
-    return encoded;
+    return encodedData;
 }
 
 std::string Base64::decode(const std::string &encoded_string) {
-    int decodeLen = static_cast<int>(encoded_string.size() * 3 / 4);
+    std::string normalized_encoded_string = normalizeBase64(encoded_string);
+    int decodeLen = static_cast<int>(normalized_encoded_string.size() * 3 / 4);
     std::vector<unsigned char> buffer(decodeLen);
 
-    int decoded_size = EVP_DecodeBlock(buffer.data(), reinterpret_cast<const unsigned char*>(encoded_string.data()), static_cast<int> (encoded_string.size()));
+    int decoded_size = EVP_DecodeBlock(buffer.data(), reinterpret_cast<const unsigned char*>(normalized_encoded_string.data()), static_cast<int> (normalized_encoded_string.size()));
     if (decoded_size < 0) {
         std::cerr << "Failed to decode base64 input\n";
         return "";
@@ -60,6 +53,13 @@ std::string Base64::decode(const std::string &encoded_string) {
     return decodedData;
 }
 
-bool Base64::isBase64(unsigned char c) {
-    return (isalnum(c) || (c == '+') || (c == '/'));
+std::string Base64::normalizeBase64(const std::string &input) {
+    std::string normalized = input;
+    // Replace URL-safe characters
+    std::replace(normalized.begin(), normalized.end(), '-', '+');
+    std::replace(normalized.begin(), normalized.end(), '_', '/');
+    // Remove newline characters
+    normalized.erase(std::remove(normalized.begin(), normalized.end(), '\n'), normalized.end());
+    normalized.erase(std::remove(normalized.begin(), normalized.end(), '\r'), normalized.end());
+    return normalized;
 }
