@@ -3,7 +3,6 @@ vcpkg/
 *.exe
 .vscode/
 *.json
-*.png
 output-client/
 output-server/
 message-list.txt
