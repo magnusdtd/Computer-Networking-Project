@@ -1,12 +1,14 @@
 #include "VideoRecorder.hpp"
 
-void VideoRecorder::startRecording(int durationInSeconds)
+std::string VideoRecorder::startRecording(int durationInSeconds, std::string &filePath)
 {
+    std::string result;
     auto start = std::chrono::steady_clock::now();
     cv::VideoCapture cam(0);
     if (!cam.isOpened()) {
-        std::cerr << "Can't open webcam\n";
-        return;
+        result = "Failed: Can't open webcam\n";
+        std::cerr << result;
+        return result;
     }
 
     cv::Mat frame;
@@ -22,14 +24,14 @@ void VideoRecorder::startRecording(int durationInSeconds)
         cv::flip(frame, frame, 1);
 
         if (!recording) {
-            std::string fileName = getFileName();
-            std::string filePath = prefixFilePath + fileName;
             int frameWidth = static_cast<int>(cam.get(cv::CAP_PROP_FRAME_WIDTH));
             int frameHeight = static_cast<int>(cam.get(cv::CAP_PROP_FRAME_HEIGHT));
             videoWriter.open(filePath, cv::VideoWriter::fourcc('H', '2', '6', '4'), frameRate, cv::Size(frameWidth, frameHeight));
             if (!videoWriter.isOpened()) {
-                std::cerr << "Failed to open video writer\n";
+                result = "Failed to open video writer\n";
+                std::cerr << result;
                 videoWriter.release();
+                return result;
             } else {
                 recording = true;
             }
@@ -49,27 +51,6 @@ void VideoRecorder::startRecording(int durationInSeconds)
 
     cam.release();
     cv::destroyAllWindows();
-}
 
-std::string VideoRecorder::getFileName()
-{
-    std::time_t currentTime = std::time(0);
-    std::tm localTime;
-    localtime_s(&localTime, &currentTime);
-
-    int year = localTime.tm_year + 1900;
-    int month = localTime.tm_mon + 1;
-    int day = localTime.tm_mday;
-    int hour = localTime.tm_hour;
-    int minute = localTime.tm_min;
-    int seconds = localTime.tm_sec;
-
-    std::ostringstream oss;
-    oss << "VID" << year << (month < 10 ? "0" : "") << month
-        << (day < 10 ? "0" : "") << day
-        << (hour < 10 ? "0" : "") << hour
-        << (minute < 10 ? "0" : "") << minute
-        << (seconds < 10 ? "0" : "") << seconds
-        << ".mp4";
-    return oss.str();
+    return "Screen recording started for " + std::to_string(durationInSeconds) + " seconds. File at: " + filePath;
 }

