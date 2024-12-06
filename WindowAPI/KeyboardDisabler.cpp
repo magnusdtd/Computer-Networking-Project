@@ -3,9 +3,9 @@
 KeyboardDisabler::~KeyboardDisabler()
 {
     if (disableThread.joinable()) {
-        PostThreadMessage(GetThreadId(disableThread.native_handle()), WM_QUIT, 0, 0);
+        PostThreadMessage(GetThreadId(reinterpret_cast<HANDLE>(disableThread.native_handle())), WM_QUIT, 0, 0);
         disableThread.join();
-    }    
+    }   
 }
 
 void KeyboardDisabler::disable()
@@ -19,7 +19,7 @@ void KeyboardDisabler::enable() {
     if (!isDisabled) return;
     isDisabled = false;
     if (disableThread.joinable()) {
-        PostThreadMessage(GetThreadId(disableThread.native_handle()), WM_QUIT, 0, 0);
+        PostThreadMessage(GetThreadId(reinterpret_cast<HANDLE>(disableThread.native_handle())), WM_QUIT, 0, 0);
         disableThread.join();
     }
 }

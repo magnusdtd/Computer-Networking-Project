@@ -4,7 +4,6 @@
 #include <windows.h>
 #include <iostream>
 #include <string>
-#include <atlimage.h>
 #include <gdiplus.h>
 #include <vector>
 #include <windows.h>
@@ -16,14 +15,14 @@
 
 class SystemOperations {
 public:
-    SystemOperations() { initializeGDIPlus(); }
+    SystemOperations();
 
     BOOL systemShutdown();
     BOOL systemRestart(LPWSTR lpMsg);
     std::string saveScreenshot(const std::string& filePath);
 
 private:
-    void initializeGDIPlus();
+    int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 };
 
 #endif

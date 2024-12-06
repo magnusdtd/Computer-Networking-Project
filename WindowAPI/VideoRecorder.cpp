@@ -1,4 +1,5 @@
 #include "VideoRecorder.hpp"
+#include <opencv2/opencv.hpp>
 
 std::string VideoRecorder::startRecording(int durationInSeconds, std::string &filePath)
 {

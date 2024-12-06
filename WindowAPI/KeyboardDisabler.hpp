@@ -22,7 +22,7 @@ private:
     HHOOK hHook;
 
     void disableKeyboardThread();
-    static LRESULT CALLBACK KeyboardDisabler::KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam);
 };
 
 #endif

@@ -1,5 +1,17 @@
 #include "SystemOperations.hpp"
 
+SystemOperations::SystemOperations()
+{
+    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    Gdiplus::Status status = GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
+
+    if (status == Gdiplus::Ok)
+        std::cout << "GDIPlus successfully initialized.\n";
+    else
+        std::cout << "Failed to initialize GDI+. Status: " << status << "\n";
+}
+
 BOOL SystemOperations::systemShutdown()
 {
     HANDLE hToken; 
@@ -86,18 +98,6 @@ BOOL SystemOperations::systemRestart(LPWSTR lpMsg)
     return TRUE; 
 }
 
-void SystemOperations::initializeGDIPlus()
-{
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    Gdiplus::Status status = GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
-
-    if (status == Gdiplus::Ok)
-        std::cout << "GDIPlus successfully initialized.\n";
-    else
-        std::cout << "Failed to initialize GDI+. Status: " << status << "\n";
-}
-
 std::string SystemOperations::saveScreenshot(const std::string& filePath) 
 {
     HWND hwnd = GetDesktopWindow();
@@ -118,51 +118,60 @@ std::string SystemOperations::saveScreenshot(const std::string& filePath)
         return "Failed to capture screen.";
     }
 
-    std::vector<BYTE> buf;
-    IStream* stream = nullptr;
-    HRESULT hr = CreateStreamOnHGlobal(0, TRUE, &stream);
+    Gdiplus::Bitmap bitmap(hBitmap, nullptr);
+    CLSID pngClsid;
+    Gdiplus::Status status = Gdiplus::Ok;
 
-    if (FAILED(hr)) {
-        std::cout << "Failed to create stream.\n";
+    // Get the CLSID of the PNG encoder.
+    int encoderStatus = GetEncoderClsid(L"image/png", &pngClsid);
+    if (encoderStatus != 0) {
+        std::cout << "Failed to get PNG encoder CLSID.\n";
         DeleteObject(hBitmap);
         DeleteDC(hdcMemDC);
-        return "Failed to create stream.";
+        return "Failed to get PNG encoder CLSID.";
     }
 
-    CImage image;
-    ULARGE_INTEGER liSize;
-    image.Attach(hBitmap);
-    hr = image.Save(stream, Gdiplus::ImageFormatPNG);
-
-    if (FAILED(hr)) {
-        std::cout << "Failed to save image to stream.\n";
-        stream->Release();
-        DeleteObject(hBitmap);
-        DeleteDC(hdcMemDC);
-        return "Failed to save image to stream.";
-    }
-
-    IStream_Size(stream, &liSize);
-    DWORD len = liSize.LowPart;
-    IStream_Reset(stream);
-    buf.resize(len);
-    IStream_Read(stream, &buf[0], len);
-    stream->Release();
-
-    std::fstream fileBuffer;
-    fileBuffer.open(filePath, std::fstream::binary | std::fstream::out);
-    if (!fileBuffer.is_open()) {
-        std::cout << "Failed to open file for writing.\n";
-        DeleteObject(hBitmap);
-        DeleteDC(hdcMemDC);
-        return "Failed to open file for writing.\n";
-    }
-
-    fileBuffer.write(reinterpret_cast<const char*>(&buf[0]), buf.size() * sizeof(BYTE));
-    fileBuffer.close();
+    std::wstring wFilePath(filePath.begin(), filePath.end());
+    status = bitmap.Save(wFilePath.c_str(), &pngClsid, nullptr);
 
     DeleteObject(hBitmap);
     DeleteDC(hdcMemDC);
 
-    return "Capture screen successful, new file at " + filePath ;
+    if (status != Gdiplus::Ok) {
+        std::cout << "Failed to save image to file.\n";
+        return "Failed to save image to file.";
+    }
+
+    return "Capture screen successful, new file at " + filePath;
+}
+
+int SystemOperations::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
+{
+    UINT num = 0;          // number of image encoders
+    UINT size = 0;         // size of the image encoder array in bytes
+
+    Gdiplus::ImageCodecInfo* pImageCodecInfo = nullptr;
+
+    Gdiplus::GetImageEncodersSize(&num, &size);
+    if (size == 0) {
+        return -1;  // Failure
+    }
+
+    pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
+    if (pImageCodecInfo == nullptr) {
+        return -1;  // Failure
+    }
+
+    Gdiplus::GetImageEncoders(num, size, pImageCodecInfo);
+
+    for (UINT j = 0; j < num; ++j) {
+        if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0) {
+            *pClsid = pImageCodecInfo[j].Clsid;
+            free(pImageCodecInfo);
+            return j;  // Success
+        }
+    }
+
+    free(pImageCodecInfo);
+    return -1;  // Failure
 }

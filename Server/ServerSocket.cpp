@@ -148,7 +148,7 @@ void ServerSocket::initializeHandlers() {
 
     handlers[RESTART] = [this](SOCKET &clientSocket, const std::string& command) { 
         sendResponse(clientSocket, "Server has been restart!\n");
-        LPWSTR restartMessage = L"RESTART"; 
+        wchar_t restartMessage[] = L"RESTART"; 
         systemOperations->systemRestart(restartMessage); 
     };
 

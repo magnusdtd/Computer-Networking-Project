@@ -9,6 +9,8 @@
 #include <openssl/buffer.h>
 #include <thread>
 #include <future>
+#include <algorithm>
+
 
 class Base64 {
 public:
