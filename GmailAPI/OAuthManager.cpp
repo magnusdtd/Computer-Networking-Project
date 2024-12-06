@@ -15,7 +15,8 @@ OAuthManager::~OAuthManager() {
 void OAuthManager::readOAuthFile() {
     std::fstream readBuffer(oauthFilePath, std::ios::in);
     if (!readBuffer.is_open()) {
-        throw std::runtime_error("Cannot open " + oauthFilePath);
+        std::cerr << "Cannot open " + oauthFilePath << "\n";
+        exit(2);
     }
 
     nlohmann::json jsonContent;
@@ -26,7 +27,8 @@ void OAuthManager::readOAuthFile() {
         clientId = jsonContent["installed"]["client_id"];
         clientSecret = jsonContent["installed"]["client_secret"];
     } else {
-        throw std::runtime_error("Invalid OAuth file format.");
+        std::cerr << "Invalid OAuth file format.\n";
+        exit(3);
     }
 }
 

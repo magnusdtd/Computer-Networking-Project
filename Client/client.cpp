@@ -6,15 +6,13 @@ int main() {
     ClientSocket client(
         "./GmailAPI/oauth2.json", 
         "./GmailAPI/token.json", 
-        "./GmailAPI/script-auto.ps1", 
-        "./GmailAPI/message-list.txt"
+        "./GmailAPI/script-auto.ps1"
     );
 
     try {
         while (!client.getStopClient()) {
             std::cout << "\t -> [Client] Client is querying for command ...\n";
             client.query("is:unread", "");
-            client.markAsRead();
             Sleep(3000); // Sleep for 3 seconds before checking again
         }
     } catch (const std::exception& e) {

@@ -49,6 +49,19 @@ This project is built for Windows.
   - `VideoRecorder.hpp`: Header file for video recorder.
   - `VideoRecorder.cpp`: Implementation file for video recorder.
 
+## Additional files for build
+
+- `oauth2.json`: Your OAuth 2.0 credentials, you can get it in the Google API Console.
+- `account.json`: Store your admin mail.
+
+```json
+{
+    "userName": "<your-admin-mail>",
+    "password": "<password]>"
+}
+```
+Place these files in ./GmailAPI/ folder.
+
 ## UML Diagram
 
 ![alt text](./img/UML-diagram.png "UML diagram")
@@ -78,10 +91,7 @@ To build the project, follow these steps:
     ```sh
     .\run.ps1
     ```
-6. Build and run test cases (optional):
-    ```sh
-    .\test.ps1
-    ```
+
 ## Contact
 
 For any questions or issues, please open an issue on the GitHub repository.

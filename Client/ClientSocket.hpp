@@ -40,7 +40,7 @@ private:
     std::vector<std::string> splitArguments(const std::string& str);
 
 public:
-    ClientSocket(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath);
+    ClientSocket(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath);
 
     ~ClientSocket();
 
@@ -56,7 +56,7 @@ public:
 
     void processQueue();
 
-    void fetchMessageDetails(CURL *curl, const std::string &messageUrl, std::string &readBuffer, std::ofstream &file) override;
+    void fetchMessageDetails(CURL *curl, const std::string &messageUrl, std::string &readBuffer) override;
 };
 
 #endif

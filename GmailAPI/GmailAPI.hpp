@@ -9,7 +9,7 @@
 
 class GmailAPI : OAuthManager {
 public:
-    GmailAPI(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath, const std::string& messageListFilePath);
+    GmailAPI(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath);
 
     ~GmailAPI();
 
@@ -19,14 +19,13 @@ public:
 
     void query(const std::string& query, const std::string& userName);
 
-    void markAsRead();
+    void markAsRead(const std::string& messageId);
 
 protected:
 
     Base64 *base64;
 
 private:
-    std::string messageListFilePath;
 
     std::string readFile(const std::string& filePath);
 
@@ -34,9 +33,7 @@ private:
 
     CURL* initializeCurl(const std::string& url, const std::string& tokenType, const std::string& accessToken, std::string& readBuffer);
 
-    virtual void fetchMessageDetails(CURL* curl, const std::string& messageUrl, std::string& readBuffer, std::ofstream& file);
-
-    std::vector<std::string> extractMessageIds(const std::string& filename);
+    virtual void fetchMessageDetails(CURL* curl, const std::string& messageUrl, std::string& readBuffer) = 0;
 };
 
 #endif

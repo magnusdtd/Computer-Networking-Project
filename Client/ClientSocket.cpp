@@ -45,8 +45,8 @@ std::vector<std::string> ClientSocket::splitArguments(const std::string &str)
     return result;
 }
 
-ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &tokenFilePath, const std::string &scriptFilePath, const std::string &messageListFilePath)
-    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath, messageListFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false)
+ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &tokenFilePath, const std::string &scriptFilePath)
+    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false)
 {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -263,21 +263,19 @@ void ClientSocket::processQueue() {
 
             if (!isValidCommand)
                 std::cout << "No command found\n";
+            
+            markAsRead(user->messageId);
 
             delete user;
         }
     }
 }
 
-void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl, std::string &readBuffer, std::ofstream &file)
+void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl, std::string &readBuffer)
 {
     curl_easy_setopt(curl, CURLOPT_URL, messageUrl.c_str());
     readBuffer.clear();
     CURLcode res = curl_easy_perform(curl);
-
-    std::ofstream jsonFile("./GmailAPI/response.json", std::ios::out);
-    jsonFile << readBuffer << "\n";
-    jsonFile.close();
 
     if (res == CURLE_OK) {
         auto messageResponse = nlohmann::json::parse(readBuffer);
@@ -285,8 +283,14 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
             const auto& payload = messageResponse["payload"];
             std::string subject;
             std::string body;
-            std::string sender;
+            std::string senderName;
             std::string senderEmail;
+            std::string messageId;
+
+            // Extract message ID
+            if (messageResponse.contains("id")) {
+                messageId = messageResponse["id"];
+            }
 
             // Extract subject, sender, and sender email
             if (payload.contains("headers")) {
@@ -294,11 +298,11 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
                     if (header["name"] == "Subject") {
                         subject = header["value"];
                     } else if (header["name"] == "From") {
-                        sender = header["value"];
-                        size_t start = sender.find('<');
-                        size_t end = sender.find('>');
+                        senderName = header["value"];
+                        size_t start = senderName.find('<');
+                        size_t end = senderName.find('>');
                         if (start != std::string::npos && end != std::string::npos) {
-                            senderEmail = sender.substr(start + 1, end - start - 1);
+                            senderEmail = senderName.substr(start + 1, end - start - 1);
                         }
                     }
                 }
@@ -309,7 +313,6 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
                 for (const auto& part : payload["parts"]) {
                     if (part.contains("mimeType") && part["mimeType"] == "text/plain" && part.contains("body") && part["body"].contains("data")) {
                         std::string temp = part["body"]["data"];
-                        std::cout << "Body - data: " << temp << '\n';
                         body = base64->decode(temp);
                     }
                 }
@@ -317,13 +320,8 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
                 body = base64->decode(payload["body"]["data"]);
             }
 
-            // file << "From: " << sender << "\n";
-            // file << "Sender email: " << senderEmail << "\n";
-            // file << "Subject: " << subject << "\n";
-            // file << "Body: " << body << "\n\n";
-
             // Create a User object and add it to the queue
-            User* user = new User(sender, senderEmail, subject, body);
+            User* user = new User(messageId, senderName, senderEmail, subject, body);
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
                 userQueue.push(user);
@@ -331,6 +329,6 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
             queueCondVar.notify_one();
         }
     } else {
-        file << "Failed to fetch message details for URL: " << messageUrl << "\n";
+        std::cerr << "Failed to fetch message details for URL: " << messageUrl << "\n";
     }
 }
