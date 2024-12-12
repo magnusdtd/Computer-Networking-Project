@@ -4,6 +4,7 @@
 #include "OAuthManager.hpp"
 #include "Base64.hpp"
 #include "User.hpp"
+#include "HTMLGenerator.hpp"
 #include <queue>
 #include <sstream>
 
@@ -33,7 +34,7 @@ private:
 
     CURL* initializeCurl(const std::string& url, const std::string& tokenType, const std::string& accessToken, std::string& readBuffer);
 
-    virtual void fetchMessageDetails(CURL* curl, const std::string& messageUrl, std::string& readBuffer) = 0;
+    virtual void fetchMessageDetails(CURL* curl, const std::string& messageUrl, std::string& readBuffer);
 };
 
 #endif

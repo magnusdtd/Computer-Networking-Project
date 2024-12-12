@@ -51,7 +51,8 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     nlohmann::json emailJson;
-    std::string rawEmail = "To: " + to + "\r\n" + "Subject: " + subject + "\r\n\r\n" + body;
+    std::string htmlBody = HTMLGenerator::htmlMail(body);
+    std::string rawEmail = "To: " + to + "\r\n" + "Subject: " + subject + "\r\n" + "Content-Type: text/html; charset=UTF-8\r\n\r\n" + htmlBody;
     std::string encodedEmail = base64->encode(rawEmail);
     emailJson["raw"] = encodedEmail;
     std::string emailData = emailJson.dump();
@@ -118,15 +119,18 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
         return;
     }
 
+    std::string htmlBody = HTMLGenerator::htmlMail(body);
+
     // Construct the email with attachment
     std::string boundary = "boundary";
+    std::string contentType = "text/html";
     std::string rawEmail = 
         "To: " + to + "\r\n" +
         "Subject: " + subject + "\r\n" +
         "Content-Type: multipart/mixed; boundary=\"" + boundary + "\"\r\n\r\n" +
         "--" + boundary + "\r\n" +
-        "Content-Type: text/plain; charset=\"UTF-8\"\r\n\r\n" +
-        body + "\r\n\r\n" +
+        "Content-Type: " + contentType + "; charset=\"UTF-8\"\r\n\r\n" +
+        htmlBody + "\r\n\r\n" +
         "--" + boundary + "\r\n" +
         "Content-Type: " + mimeType + "; name=\"" + filePath + "\"\r\n" +
         "Content-Transfer-Encoding: base64\r\n" +
@@ -238,7 +242,6 @@ CURL* GmailAPI::initializeCurl(const std::string& url, const std::string& tokenT
     return curl;
 }
 
-
 void GmailAPI::markAsRead(const std::string& messageId) {
     if (messageId.empty()) {
         std::cout << "\t Message ID is empty\n";
@@ -274,3 +277,65 @@ void GmailAPI::markAsRead(const std::string& messageId) {
     }
     curl_global_cleanup();
 }
+
+void GmailAPI::fetchMessageDetails(CURL *curl, const std::string &messageUrl, std::string &readBuffer)
+{
+    curl_easy_setopt(curl, CURLOPT_URL, messageUrl.c_str());
+    readBuffer.clear();
+    CURLcode res = curl_easy_perform(curl);
+
+    if (res == CURLE_OK) {
+        auto messageResponse = nlohmann::json::parse(readBuffer);
+        if (messageResponse.contains("payload")) {
+            const auto& payload = messageResponse["payload"];
+            std::string subject;
+            std::string body;
+            std::string senderName;
+            std::string senderEmail;
+            std::string messageId;
+
+            // Extract message ID
+            if (messageResponse.contains("id")) {
+                messageId = messageResponse["id"];
+            }
+
+            // Extract subject, sender, and sender email
+            if (payload.contains("headers")) {
+                for (const auto& header : payload["headers"]) {
+                    if (header["name"] == "Subject") {
+                        subject = header["value"];
+                    } else if (header["name"] == "From") {
+                        senderName = header["value"];
+                        size_t start = senderName.find('<');
+                        size_t end = senderName.find('>');
+                        if (start != std::string::npos && end != std::string::npos) {
+                            senderEmail = senderName.substr(start + 1, end - start - 1);
+                        }
+                    }
+                }
+            }
+
+            // Extract body
+            if (payload.contains("mimeType") && payload["mimeType"] == "multipart/alternative" && payload.contains("parts")) {
+                for (const auto& part : payload["parts"]) {
+                    if (part.contains("mimeType") && part["mimeType"] == "text/plain" && part.contains("body") && part["body"].contains("data")) {
+                        std::string temp = part["body"]["data"];
+                        body = base64->decode(temp);
+                    }
+                }
+            } else if (payload.contains("body") && payload["body"].contains("data")) {
+                body = base64->decode(payload["body"]["data"]);
+            }
+
+            std::ofstream fileBuffer("./message-list.txt", std::ios::out);
+            fileBuffer << subject << "\n";
+            fileBuffer << body << "\n";
+            fileBuffer << senderName << "\n";
+            fileBuffer << senderEmail << "\n";
+            fileBuffer << messageId << "\n\n";
+        }
+    } else {
+        std::cerr << "Failed to fetch message details for URL: " << messageUrl << "\n";
+    }
+}
+
