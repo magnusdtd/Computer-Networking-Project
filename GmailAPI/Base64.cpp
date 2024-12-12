@@ -1,56 +1,99 @@
 #include "Base64.hpp"
 
+static const std::string base64_chars = 
+             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+             "abcdefghijklmnopqrstuvwxyz"
+             "0123456789+/";
+
+static inline bool is_base64(unsigned char c) {
+    return (isalnum(c) || (c == '+') || (c == '/'));
+}
+
 std::string Base64::encode(const std::string &input) {
-    BIO* b64 = BIO_new(BIO_f_base64());
-    BIO* bio = BIO_new(BIO_s_mem());
-    bio = BIO_push(b64, bio);
-
-    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
-    BIO_write(bio, input.c_str(), static_cast<int>(input.length()));
-    BIO_flush(bio);
-
-    BUF_MEM* bufferPtr;
-    BIO_get_mem_ptr(bio, &bufferPtr);
-    std::string encodedData(bufferPtr->data, bufferPtr->length);
-    BIO_free_all(bio);
-
-    return encodedData;
+    return encode(std::vector<unsigned char>(input.begin(), input.end()));
 }
 
 std::string Base64::encode(const std::vector<unsigned char>& input) {
-    BIO* b64 = BIO_new(BIO_f_base64());
-    BIO* bio = BIO_new(BIO_s_mem());
-    bio = BIO_push(b64, bio);
+    std::string ret;
+    int i = 0;
+    int j = 0;
+    unsigned char char_array_3[3];
+    unsigned char char_array_4[4];
+    int in_len = static_cast<int>(input.size());
+    int pos = 0;
 
-    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
-    BIO_write(bio, reinterpret_cast<const char*>(input.data()), static_cast<int>(input.size()));
-    BIO_flush(bio);
+    while (in_len--) {
+        char_array_3[i++] = input[pos++];
+        if (i == 3) {
+            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+            char_array_4[3] = char_array_3[2] & 0x3f;
 
-    BUF_MEM* bufferPtr;
-    BIO_get_mem_ptr(bio, &bufferPtr);
-    std::string encodedData(bufferPtr->data, bufferPtr->length);
-    BIO_free_all(bio);
+            for(i = 0; (i <4) ; i++)
+                ret += base64_chars[char_array_4[i]];
+            i = 0;
+        }
+    }
 
-    return encodedData;
+    if (i) {
+        for(j = i; j < 3; j++)
+            char_array_3[j] = '\0';
+
+        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+        char_array_4[3] = char_array_3[2] & 0x3f;
+
+        for (j = 0; (j < i + 1); j++)
+            ret += base64_chars[char_array_4[j]];
+
+        while((i++ < 3))
+            ret += '=';
+    }
+
+    return ret;
 }
 
 std::string Base64::decode(const std::string &encoded_string) {
-    std::string normalized_encoded_string = normalizeBase64(encoded_string);
-    int decodeLen = static_cast<int>(normalized_encoded_string.size() * 3 / 4);
-    std::vector<unsigned char> buffer(decodeLen);
+    int in_len = static_cast<int>(encoded_string.size());
+    int i = 0;
+    int j = 0;
+    int in_ = 0;
+    unsigned char char_array_4[4], char_array_3[3];
+    std::string ret;
 
-    int decoded_size = EVP_DecodeBlock(buffer.data(), reinterpret_cast<const unsigned char*>(normalized_encoded_string.data()), static_cast<int> (normalized_encoded_string.size()));
-    if (decoded_size < 0) {
-        std::cerr << "Failed to decode base64 input\n";
-        return "";
+    while (in_len-- && ( encoded_string[in_] != '=') && is_base64(encoded_string[in_])) {
+        char_array_4[i++] = static_cast<unsigned char>(encoded_string[in_]); in_++;
+        if (i == 4) {
+            for (i = 0; i <4; i++)
+                char_array_4[i] = static_cast<unsigned char>(base64_chars.find(char_array_4[i]));
+
+            char_array_3[0] = ( char_array_4[0] << 2       ) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) +   char_array_4[3];
+
+            for (i = 0; (i < 3); i++)
+                ret += char_array_3[i];
+            i = 0;
+        }
     }
 
-    while (decoded_size > 0 && buffer[decoded_size - 1] == '\0') {
-        --decoded_size;
+    if (i) {
+        for (j = i; j <4; j++)
+            char_array_4[j] = 0;
+
+        for (j = 0; j <4; j++)
+            char_array_4[j] = static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
+
+        char_array_3[0] = ( char_array_4[0] << 2       ) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) +   char_array_4[3];
+
+        for (j = 0; (j < i - 1); j++) ret += char_array_3[j];
     }
 
-    std::string decodedData(buffer.begin(), buffer.begin() + decoded_size);
-    return decodedData;
+    return ret;
 }
 
 std::string Base64::normalizeBase64(const std::string &input) {
@@ -58,6 +101,7 @@ std::string Base64::normalizeBase64(const std::string &input) {
     // Replace URL-safe characters
     std::replace(normalized.begin(), normalized.end(), '-', '+');
     std::replace(normalized.begin(), normalized.end(), '_', '/');
+    
     // Remove newline characters
     normalized.erase(std::remove(normalized.begin(), normalized.end(), '\n'), normalized.end());
     normalized.erase(std::remove(normalized.begin(), normalized.end(), '\r'), normalized.end());

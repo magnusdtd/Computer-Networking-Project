@@ -38,7 +38,8 @@ std::string HTMLGenerator::htmlMail(const std::string &content)
         <div class='main'>
             <div class="container">
                 <p class="app__name">👻 Remote Control with Email Service 👻</p>
-                <p class="app__greeting">Greeting from <span style='font-weight: bold;'>Đàm Tiến Đạt, Huỳnh Cung, Lê Xuân Trí </span> - Regular Program 2023, University of Science, VNUHCM.</p>
+                <p class="app__greeting">Greeting from <span style='font-weight: bold;'>Đàm Tiến Đạt, Huỳnh Cung, Lê Xuân Trí </span></p>
+                <p class="app__greeting">Regular Program 2023, University of Science, VNUHCM</p>
                 <p class="app__desc">This is final project for <span style='font-weight: bold;'>📚 Computer Networking 🛜</span> course (CSC10008).</p>
                 <div class='divider'></div>
             </div>

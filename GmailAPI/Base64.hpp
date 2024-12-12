@@ -4,9 +4,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
-#include <openssl/buffer.h>
 #include <thread>
 #include <future>
 #include <algorithm>

@@ -16,7 +16,6 @@ set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/")
 find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenCV REQUIRED) 
-find_package(OpenSSL REQUIRED)
 
 # Include OpenCV directories
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -51,8 +50,6 @@ target_link_libraries(
     gdiplus 
     nlohmann_json::nlohmann_json 
     CURL::libcurl 
-    OpenSSL::SSL 
-    OpenSSL::Crypto 
     opencv_core
     opencv_highgui
     opencv_imgproc
@@ -80,8 +77,6 @@ target_link_libraries(
     ws2_32 
     nlohmann_json::nlohmann_json 
     CURL::libcurl 
-    OpenSSL::SSL 
-    OpenSSL::Crypto 
     opencv_core
     opencv_highgui
     opencv_imgproc
