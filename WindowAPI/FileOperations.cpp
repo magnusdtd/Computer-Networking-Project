@@ -110,12 +110,15 @@ std::string FileOperations::listFilesInDirectory(const std::wstring& directoryPa
     do {
         const std::wstring fileName = findFileData.cFileName;
         if (fileName != L"." && fileName != L"..") {
-            out << "File: " << MyUtility::wcharToString(fileName.c_str()) << '\n';
+            if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                out << "[DIR] " << MyUtility::wcharToString(fileName.c_str()) << '\n';
+            } else {
+                out << "[FILE] " << MyUtility::wcharToString(fileName.c_str()) << '\n';
+            }
         }
     } while (FindNextFileW(hFind, &findFileData) != 0);
 
     FindClose(hFind);
     out.close();
-
-    return "Successfully listed all files in directory at " + filePath;
+    return "Successfully listed files in directory at " + filePath;
 }

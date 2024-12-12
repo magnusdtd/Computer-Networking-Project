@@ -3,21 +3,20 @@ cmake_minimum_required(VERSION 3.10)
 project(RemoteDesktopWithGmailAPI LANGUAGES CXX)
 
 # Use vcpkg toolchain
-set(CMAKE_TOOLCHAIN_FILE "D:/vcpkg/scripts/buildsystems/vcpkg.cmake")
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake")
 
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the prefix path for vcpkg
-set(CMAKE_PREFIX_PATH "D:/vcpkg/installed/x64-windows/")
+set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/")
 
 # Find the required packages
 find_package(nlohmann_json REQUIRED)
-find_package(ZLIB REQUIRED)
 find_package(CURL REQUIRED)
-find_package(OpenSSL REQUIRED)
 find_package(OpenCV REQUIRED) 
+find_package(OpenSSL REQUIRED)
 
 # Include OpenCV directories
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -72,6 +71,8 @@ add_executable(
     ./GmailAPI/Base64.cpp
     ./GmailAPI/OAuthManager.hpp
     ./GmailAPI/OAuthManager.cpp
+    ./GmailAPI/HTMLGenerator.hpp
+    ./GmailAPI/HTMLGenerator.cpp
 )
 
 target_link_libraries(
@@ -92,13 +93,13 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     add_custom_command(TARGET server POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build/Debug"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "D:/vcpkg/installed/x64-windows/debug/bin"
+        "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
         "${CMAKE_SOURCE_DIR}/build/Debug")
 
     add_custom_command(TARGET client POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build/Debug"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "D:/vcpkg/installed/x64-windows/debug/bin"
+        "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
         "${CMAKE_SOURCE_DIR}/build/Debug")
 
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -106,13 +107,13 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     add_custom_command(TARGET server POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "D:/vcpkg/installed/x64-windows/debug/bin"
+        "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
         "${CMAKE_SOURCE_DIR}/build")
 
     add_custom_command(TARGET client POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "D:/vcpkg/installed/x64-windows/debug/bin"
+        "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
         "${CMAKE_SOURCE_DIR}/build")
 
 endif()

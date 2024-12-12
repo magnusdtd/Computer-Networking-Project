@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <windows.h>
 #include <iostream>
+#include <stack>
 #include "./../WindowAPI/MyUtility.hpp"
 
 class FileOperations {
