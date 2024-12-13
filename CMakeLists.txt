@@ -15,10 +15,6 @@ set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/")
 # Find the required packages
 find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
-find_package(OpenCV REQUIRED) 
-
-# Include OpenCV directories
-include_directories(${OpenCV_INCLUDE_DIRS})
 
 # Server
 # Add executable
@@ -47,13 +43,11 @@ add_executable(
 target_link_libraries(
     server PRIVATE
     ws2_32 
-    gdiplus 
-    nlohmann_json::nlohmann_json 
-    CURL::libcurl 
-    opencv_core
-    opencv_highgui
-    opencv_imgproc
-    opencv_videoio
+    strmiids
+    quartz
+    gdiplus
+    ole32
+    uuid
 )
 
 # Client
@@ -77,10 +71,6 @@ target_link_libraries(
     ws2_32 
     nlohmann_json::nlohmann_json 
     CURL::libcurl 
-    opencv_core
-    opencv_highgui
-    opencv_imgproc
-    opencv_videoio
 )
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

@@ -3,8 +3,11 @@
 
 #include <thread>
 #include <iostream>
+#include <string>
+#include <windows.h>
+#include <dshow.h>
 
-const std::string prefixFilePath = "./output-server/"; 
+const std::string prefixFilePath = "./output-server/";
 
 class VideoRecorder {
 public:

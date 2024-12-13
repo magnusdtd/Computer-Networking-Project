@@ -154,11 +154,13 @@ int SystemOperations::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 
     Gdiplus::GetImageEncodersSize(&num, &size);
     if (size == 0) {
+        std::cout << "No image encoders found.\n";
         return -1;  // Failure
     }
 
     pImageCodecInfo = (Gdiplus::ImageCodecInfo*)(malloc(size));
     if (pImageCodecInfo == nullptr) {
+        std::cout << "Failed to allocate memory for image encoders.\n";
         return -1;  // Failure
     }
 
@@ -168,10 +170,11 @@ int SystemOperations::GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
         if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0) {
             *pClsid = pImageCodecInfo[j].Clsid;
             free(pImageCodecInfo);
-            return j;  // Success
+            return 0;  // Success
         }
     }
 
+    std::cout << "PNG encoder not found.\n";
     free(pImageCodecInfo);
     return -1;  // Failure
 }
