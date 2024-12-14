@@ -1,3 +1,12 @@
+param (
+    [string]$buildType
+)
+
+if (-not $buildType) {
+    Write-Output "Usage: .\run.ps1 -buildType <MSVC|GNU>"
+    exit 1
+}
+
 Write-Output "Running project ..."
 Write-Output ""
 
@@ -14,7 +23,15 @@ if ($LASTEXITCODE -ne 0) {
 Write-Output ""
 Write-Output "Running the server executable ..."
 Write-Output ""
-$serverProcess = Start-Process -FilePath "./build/Debug/server.exe" -NoNewWindow -PassThru
+
+if ($buildType -eq "MSVC") {
+    $serverProcess = Start-Process -FilePath "./build/Debug/server.exe" -NoNewWindow -PassThru
+} elseif ($buildType -eq "GNU") {
+    $serverProcess = Start-Process -FilePath "./build/server" -NoNewWindow -PassThru
+} else {
+    Write-Error "Invalid build type specified. Use MSVC or GNU."
+    exit 1
+}
 
 Start-Sleep -Seconds 2 # Give the server some time to start
 
@@ -22,7 +39,12 @@ Start-Sleep -Seconds 2 # Give the server some time to start
 Write-Output ""
 Write-Output "Running the client executable in a new terminal ..."
 Write-Output ""
-$clientProcess = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-Command", "./build/Debug/client.exe" -PassThru
+
+if ($buildType -eq "MSVC") {
+    $clientProcess = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-Command", "./build/Debug/client.exe" -PassThru
+} elseif ($buildType -eq "GNU") {
+    $clientProcess = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-Command", "./build/client" -PassThru
+}
 
 # Wait for the client process to exit
 $clientProcess.WaitForExit()

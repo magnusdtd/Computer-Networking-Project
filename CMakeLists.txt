@@ -15,6 +15,7 @@ set(CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/")
 # Find the required packages
 find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # Server
 # Add executable
@@ -71,6 +72,8 @@ target_link_libraries(
     ws2_32 
     nlohmann_json::nlohmann_json 
     CURL::libcurl 
+    OpenSSL::SSL
+    OpenSSL::Crypto
 )
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -79,13 +82,17 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build/Debug"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-        "${CMAKE_SOURCE_DIR}/build/Debug")
+        "${CMAKE_SOURCE_DIR}/build/Debug"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/output-server"
+    )
 
     add_custom_command(TARGET client POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build/Debug"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-        "${CMAKE_SOURCE_DIR}/build/Debug")
+        "${CMAKE_SOURCE_DIR}/build/Debug"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/output-client"
+    )
 
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     
@@ -93,12 +100,16 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-        "${CMAKE_SOURCE_DIR}/build")
+        "${CMAKE_SOURCE_DIR}/build"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/output-server"
+    )
 
     add_custom_command(TARGET client POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-        "${CMAKE_SOURCE_DIR}/build")
+        "${CMAKE_SOURCE_DIR}/build"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/output-client"
+    )
 
 endif()
