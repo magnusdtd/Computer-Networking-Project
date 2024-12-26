@@ -114,16 +114,6 @@ To build the project, follow these steps:
   .\setup_and_build.ps1 GNU
   ```
 
-### Run this project
-  Run the project:
-  ```sh
-  .\run.ps1 -buildType=<MSVC|GNU>
-  ```
-  Example:
-   ```sh
-  .\run.ps1 GNU
-  ```
-
 ## Contact
 
 For any questions or issues, please open an issue on the GitHub repository.
