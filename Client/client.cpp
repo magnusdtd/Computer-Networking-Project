@@ -4,9 +4,9 @@ int main() {
     SetConsoleOutputCP(CP_UTF8);
 
     ClientSocket client(
-        "./GmailAPI/oauth2.json", 
-        "./GmailAPI/token.json", 
-        "./GmailAPI/script-auto.ps1"
+        "./scripts/oauth2.json", 
+        "./scripts/token.json", 
+        "./scripts/script.ps1"
     );
 
     try {
@@ -16,10 +16,10 @@ int main() {
             Sleep(3000); // Sleep for 3 seconds before checking again
         }
     } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        std::cerr << "Exception: " << e.what() << "\n";
         return 1;
     } catch (...) {
-        std::cerr << "Unknown exception occurred." << std::endl;
+        std::cerr << "Unknown exception occurred.\n";
         return 1;
     }
 

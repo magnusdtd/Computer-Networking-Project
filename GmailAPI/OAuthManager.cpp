@@ -44,11 +44,21 @@ void OAuthManager::getAccessToken() {
     tokenFile.seekg(0, std::ios::end);
     if (tokenFile.tellg() == 0) {
         std::cerr << "Token file is empty or cannot be opened, running script to get new token." << '\n';
-        std::string command = "powershell -ExecutionPolicy Bypass -File " 
-                            + scriptFilePath + " "
-                            + oauthFilePath + " "
-                            + "./GmailAPI/account.json" + " "
-                            + tokenFilePath;
+        
+        std::string command;
+        if (scriptFilePath.find("-auto") != std::string::npos) {
+            command = "powershell -ExecutionPolicy Bypass -File " 
+                    + scriptFilePath + " "
+                    + oauthFilePath + " "
+                    + "./scripts/account.json" + " "
+                    + tokenFilePath;
+        } else {
+            command = "powershell -ExecutionPolicy Bypass -File " 
+                    + scriptFilePath + " "
+                    + oauthFilePath + " "
+                    + tokenFilePath;
+        }
+
         int result = system(command.c_str());
         if (result != 0) {
             std::cerr << "Failed to run script\n";
@@ -59,7 +69,7 @@ void OAuthManager::getAccessToken() {
         tokenFile.open(tokenFilePath, std::ios::in);
         tokenFile.seekg(0, std::ios::end);
         if (!tokenFile.is_open() || tokenFile.tellg() == 0) {
-            std::cerr << "Failed to obtain token after running script.ps1\n";
+            std::cerr << "Failed to obtain token after running script\n";
             tokenFile.close();
             exit(1);
         }
@@ -75,10 +85,9 @@ void OAuthManager::getAccessToken() {
         jsonFile.close();
         jsonFile.open(tokenFilePath, std::ios::trunc | std::ios::out);
 
-        jsonFile.seekp(0, std::ios::beg); // Move the write position to the beginning
+        jsonFile.seekp(0, std::ios::beg);
         jsonFile << jsonResponse << "\n";
         jsonFile.close();
-
     }
     tokenFile.close();
 }

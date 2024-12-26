@@ -17,6 +17,9 @@ find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 
+# set(SFML_DIR "./SFML-2.6.2/lib/cmake/SFML")
+# find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
+
 # Server
 # Add executable
 add_executable(
@@ -40,6 +43,8 @@ add_executable(
     ./WindowAPI/MyUtility.cpp
 )
 
+target_include_directories(server PRIVATE ${SFML_INCLUDE_DIRS})
+
 # Link necessary libraries
 target_link_libraries(
     server PRIVATE
@@ -49,11 +54,15 @@ target_link_libraries(
     gdiplus
     ole32
     uuid
+    # sfml-graphics 
+    # sfml-window 
+    # sfml-system
 )
 
 # Client
 add_executable(
     client 
+    # WIN32
     ./Client/client.cpp 
     ./Client/ClientSocket.hpp 
     ./Client/ClientSocket.cpp
@@ -67,6 +76,8 @@ add_executable(
     ./GmailAPI/HTMLGenerator.cpp
 )
 
+target_include_directories(client PRIVATE ${SFML_INCLUDE_DIRS})
+
 target_link_libraries(
     client PRIVATE 
     ws2_32 
@@ -74,42 +85,32 @@ target_link_libraries(
     CURL::libcurl 
     OpenSSL::SSL
     OpenSSL::Crypto
+    # sfml-graphics 
+    # sfml-window 
+    # sfml-system
 )
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+add_custom_command(TARGET server POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:server>"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:server>/output-server"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
+    "$<TARGET_FILE_DIR:server>"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/SFML-2.6.2/bin" "$<TARGET_FILE_DIR:server>"
+)
 
-    add_custom_command(TARGET server POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build/Debug"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-        "${CMAKE_SOURCE_DIR}/build/Debug"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/output-server"
-    )
-
-    add_custom_command(TARGET client POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build/Debug"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-        "${CMAKE_SOURCE_DIR}/build/Debug"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/output-client"
-    )
-
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    
-    add_custom_command(TARGET server POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-        "${CMAKE_SOURCE_DIR}/build"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/output-server"
-    )
-
-    add_custom_command(TARGET client POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-        "${CMAKE_SOURCE_DIR}/build"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/output-client"
-    )
-
-endif()
+add_custom_command(TARGET client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:client>"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:server>/output-client"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
+    "$<TARGET_FILE_DIR:client>"
+    # COMMAND ${CMAKE_COMMAND} -E copy_directory
+    # "${CMAKE_SOURCE_DIR}/SFML-2.6.2/bin" "$<TARGET_FILE_DIR:client>"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:client>/assets"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:client>/scripts"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/GmailAPI/scripts" "$<TARGET_FILE_DIR:client>/scripts"
+)
