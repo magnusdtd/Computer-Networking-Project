@@ -99,6 +99,9 @@ std::string FileOperations::listFilesInDirectory(const std::wstring& directoryPa
         return "Failed to open output file!";
     }
 
+    // Write CSV header
+    out << "Type,Name\n";
+
     WIN32_FIND_DATAW findFileData;
     HANDLE hFind = FindFirstFileW((directoryPath + L"\\*").c_str(), &findFileData);
 
@@ -111,9 +114,9 @@ std::string FileOperations::listFilesInDirectory(const std::wstring& directoryPa
         const std::wstring fileName = findFileData.cFileName;
         if (fileName != L"." && fileName != L"..") {
             if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-                out << "[DIR] " << MyUtility::wcharToString(fileName.c_str()) << '\n';
+                out << "\"DIR\",\"" << MyUtility::wcharToString(fileName.c_str()) << "\"\n";
             } else {
-                out << "[FILE] " << MyUtility::wcharToString(fileName.c_str()) << '\n';
+                out << "\"FILE\",\"" << MyUtility::wcharToString(fileName.c_str()) << "\"\n";
             }
         }
     } while (FindNextFileW(hFind, &findFileData) != 0);

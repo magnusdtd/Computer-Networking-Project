@@ -52,3 +52,62 @@ std::string HTMLGenerator::htmlMail(const std::string &content)
     )";
     return html.str();
 }
+
+std::vector<std::string> HTMLGenerator::readAndCleanCsvFile(const std::string& filePath)
+{
+    std::ifstream file(filePath);
+    std::vector<std::string> lines;
+    if (!file.is_open()) {
+        lines.push_back("Error: Unable to open file.");
+        return lines;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        // Convert commas to dots for numbers
+        bool insideQuotes = false;
+        for (size_t i = 0; i < line.size(); ++i) {
+            if (line[i] == '\"') {
+                insideQuotes = !insideQuotes;
+            } else if (insideQuotes && line[i] == ',') {
+                line[i] = '.'; // Convert comma to dot
+            }
+        }
+        // Remove double quotes
+        line.erase(std::remove(line.begin(), line.end(), '\"'), line.end());
+        lines.push_back(line);
+    }
+
+    file.close();
+    return lines;
+}
+
+std::string HTMLGenerator::csvToHtmlTable(const std::string& filePath)
+{
+    std::vector<std::string> lines = readAndCleanCsvFile(filePath);
+    if (lines.empty() || lines[0] == "Error: Unable to open file.") {
+        return lines[0];
+    }
+
+    std::ostringstream html;
+    html << "<table class='center' style='border-collapse: collapse; border: 1px solid black;'>";
+
+    bool isHeader = true;
+    for (const auto& line : lines) {
+        html << "<tr>";
+        std::istringstream lineStream(line);
+        std::string cell;
+        while (std::getline(lineStream, cell, ',')) {
+            if (isHeader) {
+                html << "<th style='border: 1px solid black;'>" << cell << "</th>";
+            } else {
+                html << "<td style='border: 1px solid black;'>" << cell << "</td>";
+            }
+        }
+        html << "</tr>";
+        isHeader = false;
+    }
+
+    html << "</table>";
+    return html.str();
+}

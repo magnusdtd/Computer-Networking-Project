@@ -114,6 +114,51 @@ void GmailAPI::send(const std::string &to, const std::string &subject, const std
         // Encode the video data to base64
         encodedFile = base64->encode(fileContent);
     }
+    else if (fileExtension == "csv") {
+        mimeType = "text/csv";
+        std::string htmlTable = HTMLGenerator::csvToHtmlTable(filePath);
+        std::string htmlBody = HTMLGenerator::htmlMail(body + "<br><br>" + htmlTable);
+
+        // Construct the email without attachment
+        std::string boundary = "boundary";
+        std::string rawEmail = 
+            "To: " + to + "\r\n" +
+            "Subject: " + subject + "\r\n" +
+            "Content-Type: text/html; charset=\"UTF-8\"\r\n\r\n" +
+            htmlBody;
+
+        nlohmann::json emailJson;
+        emailJson["raw"] = base64->encode(rawEmail);
+
+        std::string emailData = emailJson.dump();
+
+        // Use a separate thread to send the email
+        std::thread uploadThread([this, url, emailData, headers, &readBuffer]() {
+            CURL *curl = curl_easy_init();
+            if (curl) {
+                curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, emailData.c_str());
+                curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+                CURLcode res = curl_easy_perform(curl);
+                if (res != CURLE_OK) {
+                    std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << '\n';
+                } else {
+                    std::cout << "Email sent successfully!\n";
+                    std::cout << "Response: " << readBuffer << '\n';
+                }
+
+                curl_easy_cleanup(curl);
+            }
+        });
+        uploadThread.join();
+
+        curl_slist_free_all(headers);
+        curl_global_cleanup();
+        return;
+    }
     else {
         std::cerr << "Unsupported file type\n";
         return;

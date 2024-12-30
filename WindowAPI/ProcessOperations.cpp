@@ -46,17 +46,19 @@ BOOL CALLBACK ProcessOperations::EnumWindowsProc(HWND hwnd, LPARAM lParam) {
 std::string ProcessOperations::listRunningApp(std::string &filePath)
 {
     std::ofstream out(filePath);
+
     if (!out.is_open()) {
         std::cerr << "Failed to open output file: " << filePath << '\n';
         return "Failed to open output file!";
     }
 
-    std::string result;
+    // Write CSV header
+    out << "Process Name,Process ID\n";
+
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) {
-        result = "Failed to create snapshot!\n";
-        std::cerr << result;
-        return result;
+        std::cerr << "Failed to create snapshot of running processes.\n";
+        return "Failed to create snapshot of running processes!";
     }
 
     PROCESSENTRY32 pe;
@@ -64,25 +66,21 @@ std::string ProcessOperations::listRunningApp(std::string &filePath)
 
     if (Process32First(snapshot, &pe)) {
         do {
+            std::string processName = pe.szExeFile;
             DWORD processId = pe.th32ProcessID;
-            if (processId != 0) { 
-                BOOL hasWindow = EnumWindows(EnumWindowsProc, (LPARAM)processId);
-                if (!hasWindow) {
-                    out << "Process ID: " << processId << " - " << pe.szExeFile << '\n';
-                }
-            }
+
+            // Write CSV row
+            out << "\"" << processName << "\",\"" << processId << "\"\n";
         } while (Process32Next(snapshot, &pe));
-    }
-    else {
-        result = "Failed to retrieve process information!\n";
-        std::cerr << result;
-        return result;
+    } else {
+        std::cerr << "Failed to retrieve information about the first process.\n";
+        CloseHandle(snapshot);
+        return "Failed to retrieve information about the first process!";
     }
 
     CloseHandle(snapshot);
     out.close();
-    result = "Successfully listed all running applications at " + filePath;
-    return result;
+    return "Successfully listed all running applications at " + filePath;
 }
 
 std::string ProcessOperations::listInstalledApp(std::string &filePath)
@@ -100,6 +98,9 @@ std::string ProcessOperations::listInstalledApp(std::string &filePath)
         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
         "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
     };
+
+    // Write CSV header
+    out << "Application,Path\n";
 
     for (const char* subKey : subKeys) {
         if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, subKey, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
@@ -130,7 +131,8 @@ std::string ProcessOperations::listInstalledApp(std::string &filePath)
                             exePath = uninstallString;
                         }
 
-                        out << "Application: " << displayName << " - Path: " << exePath << '\n';
+                        // Write CSV row
+                        out << "\"" << displayName << "\",\"" << exePath << "\"\n";
                     }
                     RegCloseKey(hSubKey);
                 }
