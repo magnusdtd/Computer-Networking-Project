@@ -20,6 +20,8 @@
 
 #define PORT 8080
 #define SERVER_IP "127.0.0.1"
+#define DISCOVERY_PORT 8081
+#define DISCOVERY_MESSAGE "DISCOVER_SERVER"
 
 extern std::unordered_map<std::string, std::string> messageMap;
 
@@ -38,6 +40,7 @@ private:
     bool isStopMQThread;
 
     std::vector<std::string> splitArguments(const std::string& str);
+    std::string discoverServer();
 
 public:
     ClientSocket(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath);

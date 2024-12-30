@@ -63,9 +63,18 @@ ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &
         exit(1);
     }
 
+    // std::string serverIp = discoverServer();
+    // if (serverIp.empty()) {
+    //     std::cerr << "Failed to discover server.\n";
+    //     closesocket(clientSocket);
+    //     WSACleanup();
+    //     exit(1);
+    // }
+
     clientAddress.sin_family = AF_INET;
     clientAddress.sin_port = htons(PORT);
     InetPton(AF_INET, _T(SERVER_IP), &clientAddress.sin_addr.s_addr);
+    // InetPton(AF_INET, std::wstring(serverIp.begin(), serverIp.end()).c_str(), &clientAddress.sin_addr.s_addr);
 
     if (connect(clientSocket, (SOCKADDR*)&clientAddress, sizeof(clientAddress)) == SOCKET_ERROR) {
         std::cerr << "Connection to server failed.\n";
@@ -75,6 +84,47 @@ ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &
     }
 
     messageQueueThread = std::thread(&ClientSocket::processQueue, this);
+}
+
+std::string ClientSocket::discoverServer() {
+    SOCKET discoverySocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (discoverySocket == INVALID_SOCKET) {
+        std::cerr << "Discovery socket creation failed: " << WSAGetLastError() << '\n';
+        return "";
+    }
+
+    sockaddr_in broadcastAddress;
+    broadcastAddress.sin_family = AF_INET;
+    broadcastAddress.sin_addr.s_addr = INADDR_BROADCAST;
+    broadcastAddress.sin_port = htons(DISCOVERY_PORT);
+
+    char broadcast = 1;
+    if (setsockopt(discoverySocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == SOCKET_ERROR) {
+        std::cerr << "setsockopt failed: " << WSAGetLastError() << '\n';
+        closesocket(discoverySocket);
+        return "";
+    }
+
+    if (sendto(discoverySocket, DISCOVERY_MESSAGE, strlen(DISCOVERY_MESSAGE), 0, (SOCKADDR*)&broadcastAddress, sizeof(broadcastAddress)) == SOCKET_ERROR) {
+        std::cerr << "Discovery sendto failed: " << WSAGetLastError() << '\n';
+        closesocket(discoverySocket);
+        return "";
+    }
+
+    char buffer[1024];
+    sockaddr_in serverAddress;
+    int serverAddressSize = sizeof(serverAddress);
+
+    int bytesReceived = recvfrom(discoverySocket, buffer, sizeof(buffer) - 1, 0, (SOCKADDR*)&serverAddress, &serverAddressSize);
+    if (bytesReceived == SOCKET_ERROR) {
+        std::cerr << "Discovery recvfrom failed: " << WSAGetLastError() << '\n';
+        closesocket(discoverySocket);
+        return "";
+    }
+
+    buffer[bytesReceived] = '\0';
+    closesocket(discoverySocket);
+    return std::string(buffer);
 }
 
 ClientSocket::~ClientSocket() {
@@ -149,8 +199,19 @@ bool ClientSocket::executeCommand(std::string &response, std::string& receivedFi
     if (command == "STOP") {
         memset(buffer, 0, sizeof(buffer));
         bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-        stopClient = true;
         response = "Server has been stop!";
+        return true;
+    } else if (command == "shutdown") {
+        memset(buffer, 0, sizeof(buffer));
+        bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        response = "Server has been shutdown!";
+        std::cout << "Failed to connect to server.\n";
+        return true;
+    } else if (command == "restart") {
+        memset(buffer, 0, sizeof(buffer));
+        bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        response = "Server has been restart!";
+        std::cout << "Failed to connect to server.\n";
         return true;
     }
     else if (   command == "listProcess" ||

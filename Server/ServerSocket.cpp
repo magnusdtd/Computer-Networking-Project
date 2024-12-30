@@ -37,12 +37,13 @@ ServerSocket::ServerSocket() :
     }
 
     serverAddress.sin_family = AF_INET;
-    InetPton(AF_INET, _T(SERVER_IP), &serverAddress.sin_addr.s_addr);
+    serverAddress.sin_addr.s_addr = INADDR_ANY; // Bind to any available network interface
     serverAddress.sin_port = htons(PORT);
 
     // Bind
     if (bind(serverSocket, (SOCKADDR*)&serverAddress, sizeof(serverAddress)) == SOCKET_ERROR) {
         std::cerr << "Bind failed: " << WSAGetLastError() << '\n';
+        closesocket(serverSocket);
         WSACleanup();
         exit(1);
     }
@@ -50,11 +51,15 @@ ServerSocket::ServerSocket() :
     // Listen to connection from client
     if (listen(serverSocket, 5) == SOCKET_ERROR) {
         std::cerr << "Listen failed: " << WSAGetLastError() << '\n';
+        closesocket(serverSocket);
         WSACleanup();
         exit(1);
     }
 
     std::cout << "Server is listening on port " << PORT << "...\n";
+
+    // Start a thread to handle discovery requests
+    // std::thread(&ServerSocket::handleDiscoveryRequests, this).detach();
 
     messageMap = {
         {"shutdown", SHUTDOWN},
@@ -83,6 +88,55 @@ ServerSocket::ServerSocket() :
     };
 
     initializeHandlers();
+}
+
+void ServerSocket::handleDiscoveryRequests() {
+    SOCKET discoverySocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (discoverySocket == INVALID_SOCKET) {
+        std::cerr << "Discovery socket creation failed: " << WSAGetLastError() << '\n';
+        return;
+    }
+
+    sockaddr_in discoveryAddress;
+    discoveryAddress.sin_family = AF_INET;
+    discoveryAddress.sin_addr.s_addr = INADDR_ANY;
+    discoveryAddress.sin_port = htons(DISCOVERY_PORT);
+
+    if (bind(discoverySocket, (SOCKADDR*)&discoveryAddress, sizeof(discoveryAddress)) == SOCKET_ERROR) {
+        std::cerr << "Discovery bind failed: " << WSAGetLastError() << '\n';
+        closesocket(discoverySocket);
+        return;
+    }
+
+    char buffer[1024];
+    sockaddr_in clientAddress;
+    int clientAddressSize = sizeof(clientAddress);
+
+    while (true) {
+        int bytesReceived = recvfrom(discoverySocket, buffer, sizeof(buffer) - 1, 0, (SOCKADDR*)&clientAddress, &clientAddressSize);
+        if (bytesReceived == SOCKET_ERROR) {
+            std::cerr << "Discovery recvfrom failed: " << WSAGetLastError() << '\n';
+            continue;
+        }
+
+        buffer[bytesReceived] = '\0';
+        if (std::string(buffer) == DISCOVERY_MESSAGE) {
+            std::string ip;
+            if (clientAddress.sin_addr.s_addr == htonl(INADDR_LOOPBACK)) {
+                // Respond with loopback address if the client is using loopback
+                ip = "127.0.0.1";
+            } else {
+                // Respond with the server's LAN IP address
+                char ipBuffer[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &serverAddress.sin_addr, ipBuffer, INET_ADDRSTRLEN);
+                ip = ipBuffer;
+            }
+            sendto(discoverySocket, ip.c_str(), ip.length(), 0, (SOCKADDR*)&clientAddress, clientAddressSize);
+            std::cout << "Sent discovery response to " << inet_ntoa(clientAddress.sin_addr) << '\n';
+        }
+    }
+
+    closesocket(discoverySocket);
 }
 
 ServerSocket::~ServerSocket()
@@ -130,9 +184,32 @@ void ServerSocket::sendResponse(SOCKET &clientSocket, const std::string& respons
 
 void ServerSocket::sendIPAddress(SOCKET &clientSocket)
 {
-    const char* ipAddress = SERVER_IP;
-    send(clientSocket, ipAddress, static_cast<int>(strlen(ipAddress)), 0);
-    std::cout << "Sending IP address: " << ipAddress << '\n';
+    char hostname[256];
+    if (gethostname(hostname, sizeof(hostname)) == SOCKET_ERROR) {
+        std::cerr << "Error getting hostname: " << WSAGetLastError() << '\n';
+        return;
+    }
+
+    addrinfo hints = {0}, *info;
+    hints.ai_family = AF_INET; // IPv4
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    if (getaddrinfo(hostname, nullptr, &hints, &info) != 0) {
+        std::cerr << "Error getting address info: " << WSAGetLastError() << '\n';
+        return;
+    }
+
+    for (addrinfo* p = info; p != nullptr; p = p->ai_next) {
+        sockaddr_in* sockaddr_ipv4 = reinterpret_cast<sockaddr_in*>(p->ai_addr);
+        char ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(sockaddr_ipv4->sin_addr), ip, INET_ADDRSTRLEN);
+        send(clientSocket, ip, static_cast<int>(strlen(ip)), 0);
+        std::cout << "Sending IP address: " << ip << '\n';
+        break; // Send the first found IP address
+    }
+
+    freeaddrinfo(info);
 }
 
 void ServerSocket::sendMessage(SOCKET &clientSocket, const char *message)
@@ -231,38 +308,48 @@ void ServerSocket::initializeHandlers() {
     };
     
     handlers[LIST_COMMANDS] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string commands = "Available commands: \n\t\t\t\t";
+        std::string commands = "<div style='text-align: center;'><br><h2>Available commands</h2><br>";
         for (const auto& pair : messageMap)
-            commands += pair.first + "\n\t\t\t\t";
-        commands.pop_back();
-        commands.pop_back();
-        commands.pop_back();
+            commands += pair.first + "<br>";
+        commands += "</div>";
         sendResponse(clientSocket, commands);
     };
 
     handlers[LIST_PROCESS] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string fileName = MyUtility::generateName("process_list", "txt");
+    std::string fileName = MyUtility::generateName("process_list", "csv");
+    std::string filePath = "./output-server/" + fileName;
+    std::string systemCommand = "tasklist /FO CSV > " + filePath;
+    int result = system(systemCommand.c_str());
+
+    if (result != 0) {
+        sendResponse(clientSocket, "Error: Command execution failed with exit code: " + std::to_string(result));
+    } else {
+        sendResponse(clientSocket, "Successfully listed all processes at " + filePath);
+        sendFile(clientSocket, filePath);
+    }
+};
+
+    handlers[LIST_SERVICES] = [this](SOCKET &clientSocket, const std::string& command) {
+        std::string fileName = MyUtility::generateName("services_list", "csv");
         std::string filePath = "./output-server/" + fileName;
-        std::string systemCommand = "tasklist > " + filePath;
+        std::string systemCommand = "net start > " + filePath; // Note: net start does not support CSV output directly
         int result = system(systemCommand.c_str());
 
         if (result != 0) {
             sendResponse(clientSocket, "Error: Command execution failed with exit code: " + std::to_string(result));
         } else {
-            sendResponse(clientSocket, "Successfully list all processes at " + filePath);
-            sendFile(clientSocket, filePath);
+            // Convert the output to CSV format if necessary
+            std::ifstream inputFile(filePath);
+            std::ofstream outputFile(filePath + ".csv");
+            std::string line;
+            while (std::getline(inputFile, line)) {
+                outputFile << "\"" << line << "\"" << std::endl; // Simple CSV conversion
+            }
+            inputFile.close();
+            outputFile.close();
+            sendResponse(clientSocket, "Successfully listed all services at " + filePath + ".csv");
+            sendFile(clientSocket, filePath + ".csv");
         }
-    };
-
-    handlers[LIST_SERVICES] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string fileName = MyUtility::generateName("services_list", "txt");
-        std::string filePath = "./output-server/" + fileName;
-        std::string systemCommand = "net start > " + filePath;
-        int result = system(systemCommand.c_str());
-
-        sendResponse(clientSocket, (result != 0) ? "Error: Command execution failed with exit code: " + std::to_string(result) : "Successfully list all services at " + filePath);
-
-        sendFile(clientSocket, filePath);
     };
 
     handlers[START_APP] = [this](SOCKET &clientSocket, const std::string& command) {
@@ -290,7 +377,7 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[LIST_INSTALLED_APP] = [this](SOCKET &clientSocket, const std::string& command) {
-        std::string fileName = MyUtility::generateName("installed_app_list", "txt");
+        std::string fileName = MyUtility::generateName("installed_app_list", "csv");
         std::string filePath = "./output-server/" + fileName;
         std::string result = processOperations->listInstalledApp(filePath);
         if (result.substr(0, 6) != "Failed") {
@@ -303,7 +390,7 @@ void ServerSocket::initializeHandlers() {
     };
 
     handlers[LIST_RUNNING_APP] = [this](SOCKET &clientSocket, const std::string &command) {
-        std::string fileName = MyUtility::generateName("running_app_list", "txt");
+        std::string fileName = MyUtility::generateName("running_app_list", "csv");
         std::string filePath = "./output-server/" + fileName;
         std::string result = processOperations->listRunningApp(filePath);
         if (result.substr(0, 6) != "Failed") {
@@ -322,7 +409,7 @@ void ServerSocket::initializeHandlers() {
             return;
         }
         const std::wstring directoryPath = std::wstring(tokens[1].begin(), tokens[1].end());
-        std::string fileName = MyUtility::generateName("file_list", "txt");
+        std::string fileName = MyUtility::generateName("file_list", "csv");
         std::string filePath = "./output-server/" + fileName;
         std::string result = fileOperations->listFilesInDirectory(directoryPath, filePath);
         if (result.substr(0, 6) != "Failed") {
