@@ -19,7 +19,8 @@
 #include "./../GmailAPI/GmailAPI.hpp"
 
 #define PORT 8080
-#define SERVER_IP "127.0.0.1"
+// #define SERVER_IP "127.0.0.1"
+#define SERVER_IP "192.168.1.100"
 #define DISCOVERY_PORT 8081
 #define DISCOVERY_MESSAGE "DISCOVER_SERVER"
 
