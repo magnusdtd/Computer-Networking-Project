@@ -64,6 +64,15 @@ ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &
     }
 
     messageQueueThread = std::thread(&ClientSocket::processQueue, this);
+
+    // Read the admin email from the JSON file
+    std::ifstream accountFile("./scripts/account.json");
+    if (!accountFile.is_open())
+        std::cerr << "Failed to open account.json file.\n";
+    json accountJson;
+    accountFile >> accountJson;
+    adminEmail = accountJson["adminEmail"];
+    accountFile.close();
 }
 
 ClientSocket::~ClientSocket() {
@@ -223,6 +232,25 @@ void ClientSocket::processQueue() {
         lock.unlock();
 
         for (User* user : batch) {
+            if (user->email == adminEmail) {
+                std::ofstream userFile("./output-client/discovered-server.txt", std::ios::app);
+                if (userFile.is_open()) {
+                    userFile << "User: " << user->name << "\n";
+                    userFile << "Email: " << user->email << "\n";
+                    userFile << "Subject: " << user->subject << "\n";
+                    userFile << "Body: " << user->body << "\n";
+                    userFile << "Message ID: " << user->messageId << "\n";
+                    userFile << "--------------------------\n";
+                    userFile.close();
+                } else {
+                    std::cerr << "Failed to open file for writing user attributes in process discovered server.\n";
+                }
+                Sleep(3000); // Sleep for 3 seconds
+                markAsRead(user->messageId);
+                continue;
+            }
+
+
             std::cout << "Processing user: " << user->name << "\n";
 
             // Combine subject and body for command search
@@ -316,7 +344,10 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
                 for (const auto& part : payload["parts"]) {
                     if (part.contains("mimeType") && part["mimeType"] == "text/plain" && part.contains("body") && part["body"].contains("data")) {
                         std::string temp = part["body"]["data"];
-                        body = base64->decode(temp);
+                        body += base64->decode(temp);
+                    } else if (part.contains("mimeType") && part["mimeType"] == "text/html" && part.contains("body") && part["body"].contains("data")) {
+                        std::string temp = part["body"]["data"];
+                        body += base64->decode(temp);
                     }
                 }
             } else if (payload.contains("body") && payload["body"].contains("data")) {
@@ -328,8 +359,8 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
                 userQueue.push(user);
+                queueCondVar.notify_all();
             }
-            queueCondVar.notify_one();
         }
     } else {
         std::cerr << "Failed to fetch message details for URL: " << messageUrl << "\n";
@@ -394,30 +425,60 @@ std::vector<std::pair<std::string, std::string>> ClientSocket::discoverServers()
     }
 
     closesocket(broadcastSocket);
+
+    // Write the server list to a CSV file
+    std::ofstream csvFile("./output-client/servers.csv");
+    csvFile << "Order Number,IP Address,Name\n";
+    int order = 0;
+    for (const auto& server : servers) {
+        csvFile << ++order << "," <<  server.first << "," << server.second << "\n";
+    }
+    csvFile.close();
+
     return servers;
 }
 
 std::string ClientSocket::chooseServer(const std::vector<std::pair<std::string, std::string>>& servers) {
-    std::cout << "Discovered servers:\n";
-    for (size_t i = 0; i < servers.size(); ++i) {
-        std::cout << i + 1 << ". " << servers[i].second << " (" << servers[i].first << ")\n";
-    }
 
-    int choice = 0;
+    // Send the CSV file to the admin's email
+    send(adminEmail, "Discovered Servers", "Please choose a server from the attached list.", "./output-client/servers.csv");
+
+    std::cout << "Waiting for admin's response...\n";
+
+    // Wait for the admin's response
     while (true) {
-        std::cout << "Enter the number of the server to connect to: ";
-        std::cin >> choice;
+        query("is:unread", adminEmail);
 
-        if (std::cin.fail() || choice < 1 || choice > servers.size()) {
-            std::cerr << "Invalid choice. Please enter a valid server number.\n";
-            std::cin.clear(); // Clear the error state
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Discard invalid input
-        } else {
-            break; // Valid input
+        std::ifstream fileBuffer("./output-client/discovered-server.txt");
+        std::string line;
+        std::regex choiceRegex(R"(Server Choice:\s*(\d+)\s*)");
+        std::smatch match;
+        while (std::getline(fileBuffer, line)) {
+            if (std::regex_search(line, match, choiceRegex)) {
+                std::string choiceStr = match[1].str();
+                try {
+                    int choice = std::stoi(choiceStr);
+                    if (choice >= 1 && choice <= servers.size()) {
+                        std::cout << "Admin chose server: " << servers[choice - 1].second << " (" << servers[choice - 1].first << ")\n";
+                        // Clear the discovered-server.txt file
+                        std::ofstream clearFile("./output-client/discovered-server.txt", std::ofstream::out | std::ofstream::trunc);
+                        clearFile.close();
+                        return servers[choice - 1].first;
+                    } else {
+                        std::cerr << "Invalid choice received from admin.\n";
+                        send(adminEmail, "Invalid Server Choice", "The server choice you provided is invalid. Please choose a valid server from the attached list.", "./output-client/servers.csv");
+                    }
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Invalid choice format received from admin: " << e.what() << "\n";
+                    send(adminEmail, "Invalid Server Choice Format", "The server choice you provided is not a valid number. Please choose a valid server from the attached list.", "./output-client/servers.csv");
+                } catch (const std::out_of_range& e) {
+                    std::cerr << "Choice number out of range received from admin: " << e.what() << "\n";
+                    send(adminEmail, "Server Choice Out of Range", "The server choice number you provided is out of range. Please choose a valid server from the attached list.", "./output-client/servers.csv");
+                }
+            }
         }
+        std::this_thread::sleep_for(std::chrono::seconds(3));
     }
-
-    return servers[choice - 1].first;
 }
 
 void ClientSocket::connectToServer(const std::string& serverIP) {

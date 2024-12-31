@@ -18,6 +18,8 @@
 #include <limits>
 
 #include "./../GmailAPI/GmailAPI.hpp"
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 #define PORT 8080
 #define DISCOVERY_PORT 8081
@@ -38,6 +40,8 @@ private:
     std::condition_variable queueCondVar;
     std::thread messageQueueThread;
     bool isStopMQThread;
+
+    std::string adminEmail;
 
     std::vector<std::string> splitArguments(const std::string& str);
 

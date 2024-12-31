@@ -18,7 +18,7 @@ $clientId = $json.installed.client_id
 $clientSecret = $json.installed.client_secret
 
 $json = Get-Content -Raw -Path $accountFilePath | ConvertFrom-Json
-$userName = $json.userName
+$adminEmail = $json.adminEmail
 $password = $json.password
 
 # Define multiple scopes
@@ -40,7 +40,7 @@ $driver.Navigate().GoToUrl($authUrl)
 
 # Fill in the email
 Start-Sleep -Seconds 3
-$emailElement = $driver.FindElementById("identifierId").SendKeys($userName)
+$emailElement = $driver.FindElementById("identifierId").SendKeys($adminEmail)
 # Click the "Next" button
 $nextButton = $driver.FindElementById("identifierNext").Click()
 
