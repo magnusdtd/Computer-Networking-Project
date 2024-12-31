@@ -58,9 +58,6 @@ ServerSocket::ServerSocket() :
 
     std::cout << "Server is listening on port " << PORT << "...\n";
 
-    // Start a thread to handle discovery requests
-    // std::thread(&ServerSocket::handleDiscoveryRequests, this).detach();
-
     messageMap = {
         {"shutdown", SHUTDOWN},
         {"restart", RESTART},
@@ -88,55 +85,9 @@ ServerSocket::ServerSocket() :
     };
 
     initializeHandlers();
-}
 
-void ServerSocket::handleDiscoveryRequests() {
-    SOCKET discoverySocket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (discoverySocket == INVALID_SOCKET) {
-        std::cerr << "Discovery socket creation failed: " << WSAGetLastError() << '\n';
-        return;
-    }
+    std::thread(&ServerSocket::handleBroadcast, this).detach();
 
-    sockaddr_in discoveryAddress;
-    discoveryAddress.sin_family = AF_INET;
-    discoveryAddress.sin_addr.s_addr = INADDR_ANY;
-    discoveryAddress.sin_port = htons(DISCOVERY_PORT);
-
-    if (bind(discoverySocket, (SOCKADDR*)&discoveryAddress, sizeof(discoveryAddress)) == SOCKET_ERROR) {
-        std::cerr << "Discovery bind failed: " << WSAGetLastError() << '\n';
-        closesocket(discoverySocket);
-        return;
-    }
-
-    char buffer[1024];
-    sockaddr_in clientAddress;
-    int clientAddressSize = sizeof(clientAddress);
-
-    while (true) {
-        int bytesReceived = recvfrom(discoverySocket, buffer, sizeof(buffer) - 1, 0, (SOCKADDR*)&clientAddress, &clientAddressSize);
-        if (bytesReceived == SOCKET_ERROR) {
-            std::cerr << "Discovery recvfrom failed: " << WSAGetLastError() << '\n';
-            continue;
-        }
-
-        buffer[bytesReceived] = '\0';
-        if (std::string(buffer) == DISCOVERY_MESSAGE) {
-            std::string ip;
-            if (clientAddress.sin_addr.s_addr == htonl(INADDR_LOOPBACK)) {
-                // Respond with loopback address if the client is using loopback
-                ip = "127.0.0.1";
-            } else {
-                // Respond with the server's LAN IP address
-                char ipBuffer[INET_ADDRSTRLEN];
-                inet_ntop(AF_INET, &serverAddress.sin_addr, ipBuffer, INET_ADDRSTRLEN);
-                ip = ipBuffer;
-            }
-            sendto(discoverySocket, ip.c_str(), ip.length(), 0, (SOCKADDR*)&clientAddress, clientAddressSize);
-            std::cout << "Sent discovery response to " << inet_ntoa(clientAddress.sin_addr) << '\n';
-        }
-    }
-
-    closesocket(discoverySocket);
 }
 
 ServerSocket::~ServerSocket()
@@ -241,7 +192,6 @@ void ServerSocket::initializeHandlers() {
         this->~ServerSocket();
         closesocket(clientSocket);
         std::cout << "Server has been stopped.\n";
-        exit(0);
     };
 
     handlers[CAPTURE_SCREEN] = [this](SOCKET &clientSocket, const std::string& command) {
@@ -511,4 +461,70 @@ void ServerSocket::sendFile(SOCKET &clientSocket, const std::string &filePath)
 
     file.close();
     std::cout << "File transfer complete.\n";
+}
+
+void ServerSocket::handleBroadcast() {
+    SOCKET broadcastSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (broadcastSocket == INVALID_SOCKET) {
+        std::cerr << "Failed to create broadcast socket.\n";
+        return;
+    }
+
+    sockaddr_in broadcastAddr;
+    broadcastAddr.sin_family = AF_INET;
+    broadcastAddr.sin_port = htons(DISCOVERY_PORT);
+    broadcastAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(broadcastSocket, (sockaddr*)&broadcastAddr, sizeof(broadcastAddr)) == SOCKET_ERROR) {
+        std::cerr << "Failed to bind broadcast socket.\n";
+        closesocket(broadcastSocket);
+        return;
+    }
+
+    char recvBuffer[1024];
+    sockaddr_in recvAddr;
+    int recvAddrLen = sizeof(recvAddr);
+    while (true) {
+        int bytesReceived = recvfrom(broadcastSocket, recvBuffer, sizeof(recvBuffer) - 1, 0, (sockaddr*)&recvAddr, &recvAddrLen);
+        if (bytesReceived == SOCKET_ERROR) {
+            continue;
+        }
+        recvBuffer[bytesReceived] = '\0';
+        if (strcmp(recvBuffer, DISCOVERY_MESSAGE) == 0) {
+            // Get server IP address
+            char hostname[256];
+            if (gethostname(hostname, sizeof(hostname)) == SOCKET_ERROR) {
+                std::cerr << "Error getting hostname: " << WSAGetLastError() << '\n';
+                continue;
+            }
+
+            addrinfo hints = {};
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_flags = AI_PASSIVE;
+
+            addrinfo* info;
+            if (getaddrinfo(hostname, nullptr, &hints, &info) != 0) {
+                std::cerr << "Error getting address info: " << WSAGetLastError() << '\n';
+                continue;
+            }
+
+            char ip[INET_ADDRSTRLEN];
+            for (addrinfo* p = info; p != nullptr; p = p->ai_next) {
+                sockaddr_in* ipv4 = (sockaddr_in*)p->ai_addr;
+                inet_ntop(AF_INET, &(ipv4->sin_addr), ip, INET_ADDRSTRLEN);
+                break; // Use the first IP address found
+            }
+
+            freeaddrinfo(info);
+
+            // std::cout << "Hostname: " << hostname << ", IP: " << ip << '\n';
+
+            // Send server IP address and name back to the client
+            std::string response = std::string(ip) + "," + std::string(hostname);
+            sendto(broadcastSocket, response.c_str(), response.length(), 0, (sockaddr*)&recvAddr, recvAddrLen);
+        }
+    }
+
+    closesocket(broadcastSocket);
 }
