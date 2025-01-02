@@ -1,19 +1,19 @@
 #include "ClientSocket.hpp"
 
-std::unordered_map<std::string, std::string> messageMap = {
+std::unordered_map<std::string, std::string> ClientSocket::messageMap = {
     {"shutdown", "SHUTDOWN"},
     {"restart", "RESTART"},
     {"getIP", "GET_IP"},
     {"HelloServer", "HELLO_SERVER"},
     {"STOP", "STOP"},
     {"captureScreen", "CAPTURE_SCREEN"},
-    {"copy", "COPY_FILE"},
-    {"delete", "DELETE_FILE"},
+    {"copyFile", "COPY_FILE"},
+    {"deleteFile", "DELETE_FILE"},
     {"createFolder", "CREATE_FOLDER"},
     {"copyFolder", "COPY_FOLDER"},
     {"ls", "LIST_COMMANDS"},
     {"listProcess", "LIST_PROCESS"},
-    {"listService", "LIST_SERVICES"},
+    {"listService", "LIST_SERVICE"},
     {"startApp", "START_APP"},
     {"terminateProcess", "TERMINATE_PROCESS"},
     {"listRunningApp", "LIST_RUNNING_APP"},
@@ -46,7 +46,7 @@ std::vector<std::string> ClientSocket::splitArguments(const std::string &str)
 }
 
 ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &tokenFilePath, const std::string &scriptFilePath)
-    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false)
+    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false), isWaitForAdmin(true)
 {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -245,8 +245,8 @@ void ClientSocket::processQueue() {
                 } else {
                     std::cerr << "Failed to open file for writing user attributes in process discovered server.\n";
                 }
-                Sleep(3000); // Sleep for 3 seconds
-                markAsRead(user->messageId);
+                if (!isWaitForAdmin)
+                    markAsRead(user->messageId);
                 continue;
             }
 
@@ -270,9 +270,9 @@ void ClientSocket::processQueue() {
                     std::string response, filePath;
                     bool success = false;
 
-                    if ((command == "copy" || command == "copyFolder") && args.size() >= 2) {
+                    if ((messageMap[command] == "COPY_FILE" || messageMap[command] == "COPY_FOLDER") && args.size() >= 2) {
                         success = executeCommand(response, filePath, command, "\"" + args[0] + "\"", "\"" + args[1] + "\"");
-                    } else if ((command == "delete" || command == "createFolder" || command == "startApp" || command == "terminateProcess" || command == "listFiles" || command == "screenRecording") && args.size() >= 1) {
+                    } else if ((messageMap[command] == "DELETE_FILE" || messageMap[command] == "CREATE_FOLDER" || messageMap[command] == "START_APP" || messageMap[command] == "TERMINATE_PROCESS" || messageMap[command] == "LIST_FILES" || messageMap[command] == "SCREEN_RECORDING") && args.size() >= 1) {
                         success = executeCommand(response, filePath, command, "\"" + args[0] + "\"");
                     } else {
                         success = executeCommand(response, filePath, command);
@@ -292,10 +292,10 @@ void ClientSocket::processQueue() {
                 }
             }
 
-            if (!isValidCommand)
+            if (!isValidCommand && !isWaitForAdmin)
                 std::cout << "No command found\n";
-            
-            markAsRead(user->messageId);
+            if (!isWaitForAdmin)
+                markAsRead(user->messageId);
 
             delete user;
         }
@@ -463,6 +463,7 @@ std::string ClientSocket::chooseServer(const std::vector<std::pair<std::string, 
                         // Clear the discovered-server.txt file
                         std::ofstream clearFile("./output-client/discovered-server.txt", std::ofstream::out | std::ofstream::trunc);
                         clearFile.close();
+                        isWaitForAdmin = false;
                         return servers[choice - 1].first;
                     } else {
                         std::cerr << "Invalid choice received from admin.\n";

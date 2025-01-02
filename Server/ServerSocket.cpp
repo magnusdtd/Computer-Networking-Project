@@ -1,6 +1,30 @@
 #include "ServerSocket.hpp"
 
-std::unordered_map<std::string, MessageType> ServerSocket::messageMap;
+std::unordered_map<std::string, MessageType> ServerSocket::messageMap =  {
+    {"shutdown", SHUTDOWN},
+    {"restart", RESTART},
+    {"getIP", GET_IP},
+    {"HelloServer", HELLO_SERVER},
+    {"STOP", STOP},
+    {"captureScreen", CAPTURE_SCREEN},
+    {"copyFile", COPY_FILE},
+    {"deleteFile", DELETE_FILE},
+    {"createFolder", CREATE_FOLDER},
+    {"copyFolder", COPY_FOLDER},
+    {"ls", LIST_COMMANDS},
+    {"listProcess", LIST_PROCESS},
+    {"listService", LIST_SERVICES},
+    {"startApp", START_APP},
+    {"terminateProcess", TERMINATE_PROCESS},
+    {"listRunningApp", LIST_RUNNING_APP},
+    {"listInstalledApp", LIST_INSTALLED_APP},
+    {"listFiles", LIST_FILES},
+    {"disableKeyboard", DISABLE_KEYBOARD},
+    {"enableKeyboard", ENABLE_KEYBOARD},
+    {"enableKeylogger", ENABLE_KEYLOGGER},
+    {"disableKeylogger", DISABLE_KEYLOGGER},
+    {"screenRecording", SCREEN_RECORDING}
+};
 
 ServerSocket::ServerSocket() : 
     keyloggerFilePath("./output-server/default_log.txt"),
@@ -57,32 +81,6 @@ ServerSocket::ServerSocket() :
     }
 
     std::cout << "Server is listening on port " << PORT << "...\n";
-
-    messageMap = {
-        {"shutdown", SHUTDOWN},
-        {"restart", RESTART},
-        {"getIP", GET_IP},
-        {"HelloServer", HELLO_SERVER},
-        {"STOP", STOP},
-        {"captureScreen", CAPTURE_SCREEN},
-        {"copy", COPY_FILE},
-        {"delete", DELETE_FILE},
-        {"createFolder", CREATE_FOLDER},
-        {"copyFolder", COPY_FOLDER},
-        {"ls", LIST_COMMANDS},
-        {"listProcess", LIST_PROCESS},
-        {"listService", LIST_SERVICES},
-        {"startApp", START_APP},
-        {"terminateProcess", TERMINATE_PROCESS},
-        {"listRunningApp", LIST_RUNNING_APP},
-        {"listInstalledApp", LIST_INSTALLED_APP},
-        {"listFiles", LIST_FILES},
-        {"disableKeyboard", DISABLE_KEYBOARD},
-        {"enableKeyboard", ENABLE_KEYBOARD},
-        {"enableKeylogger", ENABLE_KEYLOGGER},
-        {"disableKeylogger", DISABLE_KEYLOGGER},
-        {"screenRecording", SCREEN_RECORDING}
-    };
 
     initializeHandlers();
 
@@ -210,7 +208,7 @@ void ServerSocket::initializeHandlers() {
     handlers[COPY_FILE] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
         if (tokens.size() != 3) {
-            sendResponse(clientSocket, "Usage: copy <source_path> <destination_path>");
+            sendResponse(clientSocket, "Usage: copy &lt;source_path&gt; &lt;destination_path&gt;");
             return;
         }
 
@@ -223,7 +221,7 @@ void ServerSocket::initializeHandlers() {
     handlers[DELETE_FILE] = [this](SOCKET &clientSocket, const std::string& command) { 
         auto tokens = parseCommand(command);
         if (tokens.size() != 2) {
-            sendResponse(clientSocket, "Usage: delete <source_path>");
+            sendResponse(clientSocket, "Usage: delete &lt;source_path&gt;");
             return;
         }
 
@@ -235,7 +233,7 @@ void ServerSocket::initializeHandlers() {
     handlers[CREATE_FOLDER] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
         if (tokens.size() != 2) {
-            sendResponse(clientSocket, "Usage: createFolder <folder_path>");
+            sendResponse(clientSocket, "Usage: createFolder &lt;folder_path&gt;");
             return;
         }
 
@@ -247,12 +245,17 @@ void ServerSocket::initializeHandlers() {
     handlers[COPY_FOLDER] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
         if (tokens.size() != 3) {
-            sendResponse(clientSocket, "Usage: copyFolder <source_folder> <destination_folder>");
+            sendResponse(clientSocket, "Usage: copyFolder &lt;source_folder&gt; &lt;destination_folder&gt;");
             return;
         }
 
-        const std::wstring sourceFolder = std::wstring(tokens[1].begin(), tokens[1].end());
-        const std::wstring destinationFolder = std::wstring(tokens[2].begin(), tokens[2].end());
+        // Convert relative paths to absolute paths
+        std::filesystem::path sourcePath = std::filesystem::absolute(std::filesystem::path(tokens[1]));
+        std::filesystem::path destPath = std::filesystem::absolute(std::filesystem::path(tokens[2]));
+
+        const std::wstring sourceFolder = sourcePath.wstring();
+        const std::wstring destinationFolder = destPath.wstring();
+
         std::string result = fileOperations->copyFolder(sourceFolder.c_str(), destinationFolder.c_str());
         sendResponse(clientSocket, (result.substr(0, 6) != "Failed") ? result : "Error: " + result);
     };
@@ -305,7 +308,7 @@ void ServerSocket::initializeHandlers() {
     handlers[START_APP] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
         if (tokens.size() != 2) {
-            sendResponse(clientSocket, "Usage: startApp <application_path>");
+            sendResponse(clientSocket, "Usage: startApp &lt;application_path&gt;");
             return;
         }
 
@@ -317,7 +320,7 @@ void ServerSocket::initializeHandlers() {
     handlers[TERMINATE_PROCESS] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
         if (tokens.size() != 2) {
-            sendResponse(clientSocket, "Usage: terminateProcess <process_id>");
+            sendResponse(clientSocket, "Usage: terminateProcess &lt;process_id&gt;");
             return;
         }
 
@@ -355,7 +358,7 @@ void ServerSocket::initializeHandlers() {
     handlers[LIST_FILES] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
         if (tokens.size() != 2) {
-            sendResponse(clientSocket, "Usage: listFiles <directory_path>");
+            sendResponse(clientSocket, "Usage: listFiles &lt;directory_path&gt;");
             return;
         }
         const std::wstring directoryPath = std::wstring(tokens[1].begin(), tokens[1].end());
@@ -400,7 +403,7 @@ void ServerSocket::initializeHandlers() {
     handlers[SCREEN_RECORDING] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
         if (tokens.size() != 2) {
-            sendResponse(clientSocket, "Usage: screenRecording <duration_in_seconds>");
+            sendResponse(clientSocket, "Usage: screenRecording &lt;duration_in_seconds&gt;");
             return;
         }
 

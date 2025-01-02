@@ -25,8 +25,6 @@ using json = nlohmann::json;
 #define DISCOVERY_PORT 8081
 #define DISCOVERY_MESSAGE "DISCOVER_SERVER"
 
-extern std::unordered_map<std::string, std::string> messageMap;
-
 class ClientSocket : public GmailAPI {
 private:
     SOCKET clientSocket;
@@ -42,8 +40,11 @@ private:
     bool isStopMQThread;
 
     std::string adminEmail;
+    bool isWaitForAdmin;
 
     std::vector<std::string> splitArguments(const std::string& str);
+
+    static std::unordered_map<std::string, std::string> messageMap;
 
 public:
     ClientSocket(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath);
