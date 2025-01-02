@@ -1,6 +1,7 @@
 param (
     [string]$oauth2TokenFilePath = "./scripts/oauth2.json",
-    [string]$outputTokenFilePath = "./scripts/token.json"
+    [string]$outputTokenFilePath = "./scripts/token.json",
+    [string]$accountFilePath = "./scripts/account.json"
 )
 
 # Define the authorization URL
@@ -12,7 +13,8 @@ $clientSecret = $json.installed.client_secret
 $scopes = @(
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.modify"
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/userinfo.email"
 )
 
 $scopeString = [string]::Join("%20", $scopes)
@@ -35,6 +37,12 @@ try {
     $response = Invoke-RestMethod -Uri 'https://www.googleapis.com/oauth2/v4/token' -ContentType 'application/x-www-form-urlencoded' -Method POST -Body $body
     $response | ConvertTo-Json | Out-File -FilePath $outputTokenFilePath -Encoding utf8
     Write-Output "Token information saved to " $outputTokenFilePath
+
+    # Get user info
+    $accessToken = $response.access_token
+    $userInfo = Invoke-RestMethod -Uri 'https://www.googleapis.com/oauth2/v2/userinfo' -Headers @{Authorization = "Bearer $accessToken"}
+    $userInfo | ConvertTo-Json | Out-File -FilePath $accountFilePath -Encoding utf8
+    Write-Output "User information saved to " $accountFilePath
 } catch {
     Write-Error "Failed to retrieve the access token."
     exit 1

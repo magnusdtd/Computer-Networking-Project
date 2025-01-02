@@ -71,7 +71,7 @@ ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &
         std::cerr << "Failed to open account.json file.\n";
     json accountJson;
     accountFile >> accountJson;
-    adminEmail = accountJson["adminEmail"];
+    adminEmail = accountJson["email"];
     accountFile.close();
 }
 
