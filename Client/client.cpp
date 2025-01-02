@@ -10,10 +10,19 @@ int main() {
     );
 
     try {
-        while (!client.getStopClient()) {
-            std::cout << "\t -> [Client] Client is querying for command ...\n";
-            client.query("is:unread", "");
-            Sleep(3000); // Sleep for 3 seconds before checking again
+        while (true) {
+            std::vector<std::pair<std::string, std::string>> servers = client.discoverServers();
+
+            std::string chosenServer = client.chooseServer(servers);
+
+            // Connect to the chosen server
+            client.connectToServer(chosenServer);
+
+            while (!client.getStopClient()) {
+                std::cout << "\t -> [Client] Client is querying for command ...\n";
+                client.query("is:unread", "");
+                Sleep(3000); // Sleep for 3 seconds before checking again
+            }
         }
     } catch (const std::exception& e) {
         std::cerr << "Exception: " << e.what() << "\n";

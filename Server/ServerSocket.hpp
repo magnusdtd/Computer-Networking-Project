@@ -84,7 +84,7 @@ private:
 
     std::string keyloggerFilePath;
 
-    void handleDiscoveryRequests();
+    void handleBroadcast();
 
 public:
     ServerSocket();

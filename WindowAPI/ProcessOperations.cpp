@@ -3,8 +3,53 @@
 std::string ProcessOperations::StartApplication(const std::wstring& applicationPath) {
     HINSTANCE result = ShellExecuteW(NULL, L"open", applicationPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
     if ((intptr_t)result <= 32) {
-        std::wcerr << L"Failed to start application. Error code: " << (intptr_t)result << std::endl;
-        return "Failed";
+        std::wstring errorMessage;
+        switch ((intptr_t)result) {
+            case 0:
+                errorMessage = L"The operating system is out of memory or resources.";
+                break;
+            case ERROR_FILE_NOT_FOUND:
+                errorMessage = L"The specified file was not found.";
+                break;
+            case ERROR_PATH_NOT_FOUND:
+                errorMessage = L"The specified path was not found.";
+                break;
+            case ERROR_BAD_FORMAT:
+                errorMessage = L"The .exe file is invalid (non-Win32 .exe or error in .exe image).";
+                break;
+            case SE_ERR_ACCESSDENIED:
+                errorMessage = L"The operating system denied access to the specified file.";
+                break;
+            case SE_ERR_ASSOCINCOMPLETE:
+                errorMessage = L"The file name association is incomplete or invalid.";
+                break;
+            case SE_ERR_DDEBUSY:
+                errorMessage = L"The DDE transaction could not be completed because other DDE transactions were being processed.";
+                break;
+            case SE_ERR_DDEFAIL:
+                errorMessage = L"The DDE transaction failed.";
+                break;
+            case SE_ERR_DDETIMEOUT:
+                errorMessage = L"The DDE transaction could not be completed because the request timed out.";
+                break;
+            case SE_ERR_DLLNOTFOUND:
+                errorMessage = L"The specified DLL was not found.";
+                break;
+            case SE_ERR_NOASSOC:
+                errorMessage = L"There is no application associated with the given file name extension.";
+                break;
+            case SE_ERR_OOM:
+                errorMessage = L"There was not enough memory to complete the operation.";
+                break;
+            case SE_ERR_SHARE:
+                errorMessage = L"A sharing violation occurred.";
+                break;
+            default:
+                errorMessage = L"Unknown error.";
+                break;
+        }
+        std::wcerr << L"Failed to start application. Error code: " << (intptr_t)result << L". " << errorMessage << std::endl;
+        return "Failed: " + MyUtility::wcharToString(errorMessage.c_str());
     }
     return "Succeeded start application with path: " + MyUtility::wcharToString(applicationPath.c_str());
 }

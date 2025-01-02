@@ -1,19 +1,19 @@
 #include "ClientSocket.hpp"
 
-std::unordered_map<std::string, std::string> messageMap = {
+std::unordered_map<std::string, std::string> ClientSocket::messageMap = {
     {"shutdown", "SHUTDOWN"},
     {"restart", "RESTART"},
     {"getIP", "GET_IP"},
     {"HelloServer", "HELLO_SERVER"},
     {"STOP", "STOP"},
     {"captureScreen", "CAPTURE_SCREEN"},
-    {"copy", "COPY_FILE"},
-    {"delete", "DELETE_FILE"},
+    {"copyFile", "COPY_FILE"},
+    {"deleteFile", "DELETE_FILE"},
     {"createFolder", "CREATE_FOLDER"},
     {"copyFolder", "COPY_FOLDER"},
     {"ls", "LIST_COMMANDS"},
     {"listProcess", "LIST_PROCESS"},
-    {"listService", "LIST_SERVICES"},
+    {"listService", "LIST_SERVICE"},
     {"startApp", "START_APP"},
     {"terminateProcess", "TERMINATE_PROCESS"},
     {"listRunningApp", "LIST_RUNNING_APP"},
@@ -46,7 +46,7 @@ std::vector<std::string> ClientSocket::splitArguments(const std::string &str)
 }
 
 ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &tokenFilePath, const std::string &scriptFilePath)
-    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false)
+    : GmailAPI(oauthFilePath, tokenFilePath, scriptFilePath), bytesReceived(0), stopClient(false), isStopMQThread(false), isWaitForAdmin(true)
 {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -63,68 +63,16 @@ ClientSocket::ClientSocket(const std::string &oauthFilePath, const std::string &
         exit(1);
     }
 
-    // std::string serverIp = discoverServer();
-    // if (serverIp.empty()) {
-    //     std::cerr << "Failed to discover server.\n";
-    //     closesocket(clientSocket);
-    //     WSACleanup();
-    //     exit(1);
-    // }
-
-    clientAddress.sin_family = AF_INET;
-    clientAddress.sin_port = htons(PORT);
-    InetPton(AF_INET, _T(SERVER_IP), &clientAddress.sin_addr.s_addr);
-    // InetPton(AF_INET, std::wstring(serverIp.begin(), serverIp.end()).c_str(), &clientAddress.sin_addr.s_addr);
-
-    if (connect(clientSocket, (SOCKADDR*)&clientAddress, sizeof(clientAddress)) == SOCKET_ERROR) {
-        std::cerr << "Connection to server failed.\n";
-        closesocket(clientSocket);
-        WSACleanup();
-        exit(1);
-    }
-
     messageQueueThread = std::thread(&ClientSocket::processQueue, this);
-}
 
-std::string ClientSocket::discoverServer() {
-    SOCKET discoverySocket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (discoverySocket == INVALID_SOCKET) {
-        std::cerr << "Discovery socket creation failed: " << WSAGetLastError() << '\n';
-        return "";
-    }
-
-    sockaddr_in broadcastAddress;
-    broadcastAddress.sin_family = AF_INET;
-    broadcastAddress.sin_addr.s_addr = INADDR_BROADCAST;
-    broadcastAddress.sin_port = htons(DISCOVERY_PORT);
-
-    char broadcast = 1;
-    if (setsockopt(discoverySocket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == SOCKET_ERROR) {
-        std::cerr << "setsockopt failed: " << WSAGetLastError() << '\n';
-        closesocket(discoverySocket);
-        return "";
-    }
-
-    if (sendto(discoverySocket, DISCOVERY_MESSAGE, strlen(DISCOVERY_MESSAGE), 0, (SOCKADDR*)&broadcastAddress, sizeof(broadcastAddress)) == SOCKET_ERROR) {
-        std::cerr << "Discovery sendto failed: " << WSAGetLastError() << '\n';
-        closesocket(discoverySocket);
-        return "";
-    }
-
-    char buffer[1024];
-    sockaddr_in serverAddress;
-    int serverAddressSize = sizeof(serverAddress);
-
-    int bytesReceived = recvfrom(discoverySocket, buffer, sizeof(buffer) - 1, 0, (SOCKADDR*)&serverAddress, &serverAddressSize);
-    if (bytesReceived == SOCKET_ERROR) {
-        std::cerr << "Discovery recvfrom failed: " << WSAGetLastError() << '\n';
-        closesocket(discoverySocket);
-        return "";
-    }
-
-    buffer[bytesReceived] = '\0';
-    closesocket(discoverySocket);
-    return std::string(buffer);
+    // Read the admin email from the JSON file
+    std::ifstream accountFile("./scripts/account.json");
+    if (!accountFile.is_open())
+        std::cerr << "Failed to open account.json file.\n";
+    json accountJson;
+    accountFile >> accountJson;
+    adminEmail = accountJson["adminEmail"];
+    accountFile.close();
 }
 
 ClientSocket::~ClientSocket() {
@@ -199,17 +147,20 @@ bool ClientSocket::executeCommand(std::string &response, std::string& receivedFi
     if (command == "STOP") {
         memset(buffer, 0, sizeof(buffer));
         bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        stopClient = true;
         response = "Server has been stop!";
         return true;
     } else if (command == "shutdown") {
         memset(buffer, 0, sizeof(buffer));
         bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        stopClient = true;
         response = "Server has been shutdown!";
         std::cout << "Failed to connect to server.\n";
         return true;
     } else if (command == "restart") {
         memset(buffer, 0, sizeof(buffer));
         bytesReceived = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        stopClient = true;
         response = "Server has been restart!";
         std::cout << "Failed to connect to server.\n";
         return true;
@@ -281,6 +232,25 @@ void ClientSocket::processQueue() {
         lock.unlock();
 
         for (User* user : batch) {
+            if (user->email == adminEmail) {
+                std::ofstream userFile("./output-client/discovered-server.txt", std::ios::app);
+                if (userFile.is_open()) {
+                    userFile << "User: " << user->name << "\n";
+                    userFile << "Email: " << user->email << "\n";
+                    userFile << "Subject: " << user->subject << "\n";
+                    userFile << "Body: " << user->body << "\n";
+                    userFile << "Message ID: " << user->messageId << "\n";
+                    userFile << "--------------------------\n";
+                    userFile.close();
+                } else {
+                    std::cerr << "Failed to open file for writing user attributes in process discovered server.\n";
+                }
+                if (!isWaitForAdmin)
+                    markAsRead(user->messageId);
+                continue;
+            }
+
+
             std::cout << "Processing user: " << user->name << "\n";
 
             // Combine subject and body for command search
@@ -300,9 +270,9 @@ void ClientSocket::processQueue() {
                     std::string response, filePath;
                     bool success = false;
 
-                    if ((command == "copy" || command == "copyFolder") && args.size() >= 2) {
+                    if ((messageMap[command] == "COPY_FILE" || messageMap[command] == "COPY_FOLDER") && args.size() >= 2) {
                         success = executeCommand(response, filePath, command, "\"" + args[0] + "\"", "\"" + args[1] + "\"");
-                    } else if ((command == "delete" || command == "createFolder" || command == "startApp" || command == "terminateProcess" || command == "listFiles" || command == "screenRecording") && args.size() >= 1) {
+                    } else if ((messageMap[command] == "DELETE_FILE" || messageMap[command] == "CREATE_FOLDER" || messageMap[command] == "START_APP" || messageMap[command] == "TERMINATE_PROCESS" || messageMap[command] == "LIST_FILES" || messageMap[command] == "SCREEN_RECORDING") && args.size() >= 1) {
                         success = executeCommand(response, filePath, command, "\"" + args[0] + "\"");
                     } else {
                         success = executeCommand(response, filePath, command);
@@ -322,10 +292,10 @@ void ClientSocket::processQueue() {
                 }
             }
 
-            if (!isValidCommand)
+            if (!isValidCommand && !isWaitForAdmin)
                 std::cout << "No command found\n";
-            
-            markAsRead(user->messageId);
+            if (!isWaitForAdmin)
+                markAsRead(user->messageId);
 
             delete user;
         }
@@ -374,7 +344,10 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
                 for (const auto& part : payload["parts"]) {
                     if (part.contains("mimeType") && part["mimeType"] == "text/plain" && part.contains("body") && part["body"].contains("data")) {
                         std::string temp = part["body"]["data"];
-                        body = base64->decode(temp);
+                        body += base64->decode(temp);
+                    } else if (part.contains("mimeType") && part["mimeType"] == "text/html" && part.contains("body") && part["body"].contains("data")) {
+                        std::string temp = part["body"]["data"];
+                        body += base64->decode(temp);
                     }
                 }
             } else if (payload.contains("body") && payload["body"].contains("data")) {
@@ -386,10 +359,137 @@ void ClientSocket::fetchMessageDetails(CURL *curl, const std::string &messageUrl
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
                 userQueue.push(user);
+                queueCondVar.notify_all();
             }
-            queueCondVar.notify_one();
         }
     } else {
         std::cerr << "Failed to fetch message details for URL: " << messageUrl << "\n";
+    }
+}
+
+std::vector<std::pair<std::string, std::string>> ClientSocket::discoverServers() {
+    std::vector<std::pair<std::string, std::string>> servers;
+    SOCKET broadcastSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (broadcastSocket == INVALID_SOCKET) {
+        std::cerr << "Failed to create broadcast socket.\n";
+        return servers;
+    }
+
+    int broadcastEnable = 1;
+    if (setsockopt(broadcastSocket, SOL_SOCKET, SO_BROADCAST, (char*)&broadcastEnable, sizeof(broadcastEnable)) == SOCKET_ERROR) {
+        std::cerr << "Failed to enable broadcast option.\n";
+        closesocket(broadcastSocket);
+        return servers;
+    }
+
+    sockaddr_in broadcastAddr;
+    broadcastAddr.sin_family = AF_INET;
+    broadcastAddr.sin_port = htons(DISCOVERY_PORT);
+    broadcastAddr.sin_addr.s_addr = inet_addr("192.168.1.255");
+
+    char recvBuffer[1024];
+    sockaddr_in recvAddr;
+    int recvAddrLen = sizeof(recvAddr);
+
+    while (servers.empty()) {
+        if (sendto(broadcastSocket, DISCOVERY_MESSAGE, strlen(DISCOVERY_MESSAGE), 0, (sockaddr*)&broadcastAddr, sizeof(broadcastAddr)) == SOCKET_ERROR) {
+            std::cerr << "Failed to send broadcast message.\n";
+            closesocket(broadcastSocket);
+            return servers;
+        }
+
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(broadcastSocket, &readfds);
+
+        timeval timeout;
+        timeout.tv_sec = 5; // 5 seconds timeout
+        timeout.tv_usec = 0;
+
+        int selectResult = select(0, &readfds, nullptr, nullptr, &timeout);
+        if (selectResult > 0 && FD_ISSET(broadcastSocket, &readfds)) {
+            int bytesReceived = recvfrom(broadcastSocket, recvBuffer, sizeof(recvBuffer) - 1, 0, (sockaddr*)&recvAddr, &recvAddrLen);
+            if (bytesReceived != SOCKET_ERROR) {
+                recvBuffer[bytesReceived] = '\0';
+                std::string response(recvBuffer);
+                size_t commaPos = response.find(',');
+                if (commaPos != std::string::npos) {
+                    std::string ip = response.substr(0, commaPos);
+                    std::string name = response.substr(commaPos + 1);
+                    servers.push_back(std::make_pair(ip, name));
+                }
+            }
+        } else {
+            std::cout << "No response received, resending broadcast...\n";
+        }
+    }
+
+    closesocket(broadcastSocket);
+
+    // Write the server list to a CSV file
+    std::ofstream csvFile("./output-client/servers.csv");
+    csvFile << "Order Number,IP Address,Name\n";
+    int order = 0;
+    for (const auto& server : servers) {
+        csvFile << ++order << "," <<  server.first << "," << server.second << "\n";
+    }
+    csvFile.close();
+
+    return servers;
+}
+
+std::string ClientSocket::chooseServer(const std::vector<std::pair<std::string, std::string>>& servers) {
+
+    // Send the CSV file to the admin's email
+    send(adminEmail, "Discovered Servers", "Please choose a server from the attached list.", "./output-client/servers.csv");
+
+    std::cout << "Waiting for admin's response...\n";
+
+    // Wait for the admin's response
+    while (true) {
+        query("is:unread", adminEmail);
+
+        std::ifstream fileBuffer("./output-client/discovered-server.txt");
+        std::string line;
+        std::regex choiceRegex(R"(Server Choice:\s*(\d+)\s*)");
+        std::smatch match;
+        while (std::getline(fileBuffer, line)) {
+            if (std::regex_search(line, match, choiceRegex)) {
+                std::string choiceStr = match[1].str();
+                try {
+                    int choice = std::stoi(choiceStr);
+                    if (choice >= 1 && choice <= servers.size()) {
+                        std::cout << "Admin chose server: " << servers[choice - 1].second << " (" << servers[choice - 1].first << ")\n";
+                        // Clear the discovered-server.txt file
+                        std::ofstream clearFile("./output-client/discovered-server.txt", std::ofstream::out | std::ofstream::trunc);
+                        clearFile.close();
+                        isWaitForAdmin = false;
+                        return servers[choice - 1].first;
+                    } else {
+                        std::cerr << "Invalid choice received from admin.\n";
+                        send(adminEmail, "Invalid Server Choice", "The server choice you provided is invalid. Please choose a valid server from the attached list.", "./output-client/servers.csv");
+                    }
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Invalid choice format received from admin: " << e.what() << "\n";
+                    send(adminEmail, "Invalid Server Choice Format", "The server choice you provided is not a valid number. Please choose a valid server from the attached list.", "./output-client/servers.csv");
+                } catch (const std::out_of_range& e) {
+                    std::cerr << "Choice number out of range received from admin: " << e.what() << "\n";
+                    send(adminEmail, "Server Choice Out of Range", "The server choice number you provided is out of range. Please choose a valid server from the attached list.", "./output-client/servers.csv");
+                }
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+    }
+}
+
+void ClientSocket::connectToServer(const std::string& serverIP) {
+    clientAddress.sin_family = AF_INET;
+    clientAddress.sin_port = htons(PORT);
+    InetPtonA(AF_INET, serverIP.c_str(), &clientAddress.sin_addr.s_addr);
+    if (connect(clientSocket, (SOCKADDR*)&clientAddress, sizeof(clientAddress)) == SOCKET_ERROR) {
+        std::cerr << "Connection to server failed.\n";
+        closesocket(clientSocket);
+        WSACleanup();
+        exit(1);
     }
 }
