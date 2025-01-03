@@ -382,20 +382,28 @@ std::vector<std::pair<std::string, std::string>> ClientSocket::discoverServers()
         return servers;
     }
 
-    sockaddr_in broadcastAddr;
-    broadcastAddr.sin_family = AF_INET;
-    broadcastAddr.sin_port = htons(DISCOVERY_PORT);
-    broadcastAddr.sin_addr.s_addr = inet_addr("192.168.1.255");
-
+    std::vector<std::string> broadcastAddresses = getBroadcastAddresses();
+    for (auto& ipaddr : broadcastAddresses)
+        std::cout << ipaddr << " ";
+    std::cout << "\n"; 
     char recvBuffer[1024];
     sockaddr_in recvAddr;
     int recvAddrLen = sizeof(recvAddr);
 
     while (servers.empty()) {
-        if (sendto(broadcastSocket, DISCOVERY_MESSAGE, strlen(DISCOVERY_MESSAGE), 0, (sockaddr*)&broadcastAddr, sizeof(broadcastAddr)) == SOCKET_ERROR) {
-            std::cerr << "Failed to send broadcast message.\n";
-            closesocket(broadcastSocket);
-            return servers;
+        for (const auto& broadcastIP : broadcastAddresses) {
+            sockaddr_in broadcastAddr;
+            broadcastAddr.sin_family = AF_INET;
+            broadcastAddr.sin_port = htons(DISCOVERY_PORT);
+            broadcastAddr.sin_addr.s_addr = inet_addr(broadcastIP.c_str());
+
+            std::cout << "Broadcast addr: " << broadcastIP << "\n";
+
+            if (sendto(broadcastSocket, DISCOVERY_MESSAGE, strlen(DISCOVERY_MESSAGE), 0, (sockaddr*)&broadcastAddr, sizeof(broadcastAddr)) == SOCKET_ERROR) {
+                std::cerr << "Failed to send broadcast message.\n";
+                closesocket(broadcastSocket);
+                return servers;
+            }
         }
 
         fd_set readfds;
@@ -492,4 +500,30 @@ void ClientSocket::connectToServer(const std::string& serverIP) {
         WSACleanup();
         exit(1);
     }
+}
+
+std::vector<std::string> ClientSocket::getBroadcastAddresses() {
+    std::vector<std::string> broadcastAddresses;
+    ULONG bufferSize = 0;
+    GetAdaptersInfo(nullptr, &bufferSize);
+    std::vector<char> buffer(bufferSize);
+    PIP_ADAPTER_INFO adapterInfo = reinterpret_cast<PIP_ADAPTER_INFO>(buffer.data());
+
+    if (GetAdaptersInfo(adapterInfo, &bufferSize) == NO_ERROR) {
+        while (adapterInfo) {
+            if (adapterInfo->IpAddressList.IpAddress.String[0] != '0') {
+                ULONG ip = inet_addr(adapterInfo->IpAddressList.IpAddress.String);
+                ULONG mask = inet_addr(adapterInfo->IpAddressList.IpMask.String);
+                ULONG broadcast = (ip & mask) | (~mask);
+                in_addr broadcastAddr;
+                broadcastAddr.s_addr = broadcast;
+                broadcastAddresses.push_back(inet_ntoa(broadcastAddr));
+            }
+            adapterInfo = adapterInfo->Next;
+        }
+    }
+    if (broadcastAddresses.empty()) {
+        broadcastAddresses.push_back("255.255.255.255"); // Fallback to default broadcast address
+    }
+    return broadcastAddresses;
 }

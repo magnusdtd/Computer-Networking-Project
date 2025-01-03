@@ -4,7 +4,9 @@
 #include <iostream>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <iphlpapi.h>
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "iphlpapi.lib")
 #include <tchar.h>
 
 #include <fstream>
@@ -45,6 +47,8 @@ private:
     std::vector<std::string> splitArguments(const std::string& str);
 
     static std::unordered_map<std::string, std::string> messageMap;
+
+    std::vector<std::string> getBroadcastAddresses();
 
 public:
     ClientSocket(const std::string& oauthFilePath, const std::string& tokenFilePath, const std::string& scriptFilePath);

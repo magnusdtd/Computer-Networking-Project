@@ -75,6 +75,7 @@ target_include_directories(client PRIVATE ${SFML_INCLUDE_DIRS})
 target_link_libraries(
     client PRIVATE 
     ws2_32 
+    iphlpapi
     nlohmann_json::nlohmann_json 
     CURL::libcurl 
     OpenSSL::SSL

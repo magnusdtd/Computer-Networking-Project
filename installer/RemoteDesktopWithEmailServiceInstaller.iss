@@ -18,7 +18,6 @@ SetupIconFile=RemoteDesktopWithEmailServiceIcon.ico
 [Files]
 ; Replace "build\*" with the path to your build folder
 Source: "..\build\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
-Source: "check_gcc_version.bat"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\Remote Desktop Client"; Filename: "{app}\client.exe"; IconFilename: "{app}\RemoteDesktopWithEmailServiceIcon.ico"
