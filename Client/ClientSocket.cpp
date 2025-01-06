@@ -250,8 +250,9 @@ void ClientSocket::processQueue() {
                 continue;
             }
 
-
-            std::cout << "Processing user: " << user->name << "\n";
+            if (!isWaitForAdmin) {
+                std::cout << "Processing user: " << user->name << "\n";
+            }
 
             // Combine subject and body for command search
             std::string combinedText = user->subject + " " + user->body;
@@ -383,9 +384,6 @@ std::vector<std::pair<std::string, std::string>> ClientSocket::discoverServers()
     }
 
     std::vector<std::string> broadcastAddresses = getBroadcastAddresses();
-    for (auto& ipaddr : broadcastAddresses)
-        std::cout << ipaddr << " ";
-    std::cout << "\n"; 
     char recvBuffer[1024];
     sockaddr_in recvAddr;
     int recvAddrLen = sizeof(recvAddr);

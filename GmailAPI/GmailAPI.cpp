@@ -257,7 +257,7 @@ void GmailAPI::query(const std::string& query, const std::string& userName) {
                     std::string messageId = message["id"];
                     std::string messageUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/" + messageId;
                     
-                    std::cout << "Message ID: " << messageId << ":\n";
+                    // std::cout << "Message ID: " << messageId << ":\n";
                     fetchMessageDetails(curl, messageUrl, readBuffer);
                 }
             } else {

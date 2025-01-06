@@ -1,0 +1,48 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up vcpkg
+      uses: lukka/get-vcpkg@v9
+      with:
+        vcpkgGitCommitId: 'latest'
+        vcpkgDirectory: '${{ runner.workspace }}/vcpkg'
+
+    - name: Install dependencies
+      run: |
+        .\vcpkg\vcpkg.exe install nlohmann-json curl openssl
+
+    - name: Configure CMake
+      run: cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=${{ runner.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+    - name: Build with CMake
+      run: cmake --build build --target server client
+
+    - name: Download Inno Setup
+      run: |
+        Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "is.exe"
+        Start-Process -FilePath "is.exe" -ArgumentList "/VERYSILENT" -Wait
+
+    - name: Build installer with Inno Setup
+      run: |
+        "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/RemoteDesktopWithEmailServiceInstaller.iss
+
+    - name: Upload installer artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: RemoteDesktopWithEmailServiceInstaller
+        path: RemoteDesktopWithEmailServiceInstaller.exe

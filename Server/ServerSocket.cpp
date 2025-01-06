@@ -521,8 +521,6 @@ void ServerSocket::handleBroadcast() {
 
             freeaddrinfo(info);
 
-            // std::cout << "Hostname: " << hostname << ", IP: " << ip << '\n';
-
             // Send server IP address and name back to the client
             std::string response = std::string(ip) + "," + std::string(hostname);
             sendto(broadcastSocket, response.c_str(), response.length(), 0, (sockaddr*)&recvAddr, recvAddrLen);

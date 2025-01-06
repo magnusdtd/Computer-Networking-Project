@@ -6,7 +6,7 @@ This project is built for **Windows**.
 
 ## Requirements
 - [Git](https://git-scm.com/)
-- Compiler: [GNU 13.1.0 or higher](https://gcc.gnu.org/) / [MSBuild from Visual Studio](https://visualstudio.microsoft.com/)
+- Compiler: [GNU 13.1.0 or higher](https://github.com/brechtsanders/winlibs_mingw/releases/download/13.1.0-16.0.5-11.0.0-msvcrt-r5/winlibs-x86_64-posix-seh-gcc-13.1.0-mingw-w64msvcrt-11.0.0-r5.7z) / [MSBuild from Visual Studio](https://visualstudio.microsoft.com/)
 - [CMake](https://cmake.org/)
 
 You need to install all of these.
@@ -58,15 +58,9 @@ You need to install all of these.
 ## Additional files for build
 
 - `oauth2.json`: Your OAuth 2.0 credentials, you can get it in the Google API Console.
-- `account.json`: Store your admin email.
 
-```json
-{
-    "userName": "<your-admin-email>",
-    "password": "<password>"
-}
 ```
-Place these files in the `./GmailAPI/` folder.
+Place these files in the `./GmailAPI/scripts` folder.
 
 ## UML Diagram
 
