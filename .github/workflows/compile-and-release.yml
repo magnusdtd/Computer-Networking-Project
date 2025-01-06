@@ -14,10 +14,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Set up vcpkg
-      uses: lukka/get-vcpkg@v9
+      uses: lukka/get-vcpkg@v11
       with:
         vcpkgGitCommitId: 'latest'
         vcpkgDirectory: '${{ runner.workspace }}/vcpkg'
@@ -42,7 +42,7 @@ jobs:
         "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/RemoteDesktopWithEmailServiceInstaller.iss
 
     - name: Upload installer artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: RemoteDesktopWithEmailServiceInstaller
         path: RemoteDesktopWithEmailServiceInstaller.exe
